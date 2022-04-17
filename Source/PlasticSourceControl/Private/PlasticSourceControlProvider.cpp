@@ -51,11 +51,11 @@ void FPlasticSourceControlProvider::CheckPlasticAvailability()
 {
 	FPlasticSourceControlModule& PlasticSourceControl = FModuleManager::LoadModuleChecked<FPlasticSourceControlModule>("PlasticSourceControl");
 	FString PathToPlasticBinary = PlasticSourceControl.AccessSettings().GetBinaryPath();
-	if(PathToPlasticBinary.IsEmpty())
+	if (PathToPlasticBinary.IsEmpty())
 	{
 		// Try to find Plastic binary, and update settings accordingly
 		PathToPlasticBinary = PlasticSourceControlUtils::FindPlasticBinaryPath();
-		if(!PathToPlasticBinary.IsEmpty())
+		if (!PathToPlasticBinary.IsEmpty())
 		{
 			PlasticSourceControl.AccessSettings().SetBinaryPath(PathToPlasticBinary);
 		}
@@ -63,20 +63,19 @@ void FPlasticSourceControlProvider::CheckPlasticAvailability()
 
 	if(!PathToPlasticBinary.IsEmpty())
 	{
-		// Find the path to the root Plastic directory (if any, else uses the ProjectDir)
-		const FString PathToProjectDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir());
-		bWorkspaceFound = PlasticSourceControlUtils::FindRootDirectory(PathToProjectDir, PathToWorkspaceRoot);
-
 		// Launch the Plastic SCM cli shell on the background to issue all commands during this session
-		bPlasticAvailable = PlasticSourceControlUtils::LaunchBackgroundPlasticShell(PathToPlasticBinary, PathToWorkspaceRoot);
-		if(bPlasticAvailable)
+		const FString PathToProjectDir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir());
+		bPlasticAvailable = PlasticSourceControlUtils::LaunchBackgroundPlasticShell(PathToPlasticBinary, PathToProjectDir);
+		if (bPlasticAvailable)
 		{
 			PlasticSourceControlUtils::GetPlasticScmVersion(PlasticScmVersion);
 
 			// Get user name (from the global Plastic SCM client config)
 			PlasticSourceControlUtils::GetUserName(UserName);
 
-			if(!bWorkspaceFound)
+			// Find the path to the root Plastic directory (if any, else uses the ProjectDir)
+			bWorkspaceFound = PlasticSourceControlUtils::GetWorkspacePath(PathToProjectDir, PathToWorkspaceRoot);
+			if (!bWorkspaceFound)
 			{
 				UE_LOG(LogSourceControl, Warning, TEXT("'%s' is not part of a Plastic workspace"), *FPaths::ProjectDir());
 			}

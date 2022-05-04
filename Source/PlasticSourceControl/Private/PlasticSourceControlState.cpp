@@ -193,24 +193,27 @@ FSlateIcon FPlasticSourceControlState::GetIcon() const
 	{
 	case EWorkspaceState::CheckedOut:
 	case EWorkspaceState::Replaced: // Merged (waiting for checkin)
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.CheckedOut");
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.CheckedOut");
 	case EWorkspaceState::Added:
 	case EWorkspaceState::Copied:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.OpenForAdd");
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.OpenForAdd");
 	case EWorkspaceState::Moved:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.Branched");
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.Branched");
 	case EWorkspaceState::Deleted:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.MarkedForDelete");
 	case EWorkspaceState::LocallyDeleted:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.MarkedForDelete");
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.LocallyDeleted");
 	case EWorkspaceState::Conflicted:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.NotAtHeadRevision");
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.NotAtHeadRevision");
 	case EWorkspaceState::LockedByOther:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.CheckedOutByOtherUser", NAME_None, "SourceControl.LockOverlay");
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.CheckedOutByOtherUser", NAME_None, "SourceControl.LockOverlay");
 	case EWorkspaceState::Private: // Not controlled
-	case EWorkspaceState::Changed: // Changed but unchecked-out file is in a certain way not controlled
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.NotInDepot");
-	case EWorkspaceState::Unknown:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.NotInDepot");
+	case EWorkspaceState::Changed:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.Changed");
 	case EWorkspaceState::Ignored:
+		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "PlasticSCM.Ignored");
+	case EWorkspaceState::Unknown:
 	case EWorkspaceState::Controlled: // (Unchanged) same as "Pristine" for Perforce (not checked out) ie no icon
 	default:
 		return FSlateIcon();

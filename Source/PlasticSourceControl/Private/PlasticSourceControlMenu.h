@@ -3,11 +3,25 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "ISourceControlProvider.h"
+#include "Framework/Commands/Commands.h"
 #include "Runtime/Launch/Resources/Version.h"
 
 class FMenuBuilder;
 struct FToolMenuSection;
+
+
+class FPlasticSourceControlMenuCommands : public TCommands<FPlasticSourceControlMenuCommands>
+{
+public:
+	FPlasticSourceControlMenuCommands();
+
+	virtual void RegisterCommands() override;
+
+	TSharedPtr<FUICommandInfo> PlasticSync;
+	TSharedPtr<FUICommandInfo> PlasticRevertUnchanged;
+	TSharedPtr<FUICommandInfo> PlasticRevertAll;
+	TSharedPtr<FUICommandInfo> PlasticRefresh;
+};
 
 /** Plastic SCM extension of the Source Control toolbar menu */
 class FPlasticSourceControlMenu
@@ -56,4 +70,7 @@ private:
 
 	/** Delegate called when a source control operation has completed */
 	void OnSourceControlOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult);
+
+//	TSharedRef<FUICommandList> CommandList;
+	TSharedPtr<class FUICommandList> CommandList;
 };

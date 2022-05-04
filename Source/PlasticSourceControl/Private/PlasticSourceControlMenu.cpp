@@ -30,8 +30,37 @@
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 
+FPlasticSourceControlMenuCommands::FPlasticSourceControlMenuCommands()
+	: TCommands<FPlasticSourceControlMenuCommands>
+(
+	"PlasticSourceControl", // Context name for fast lookup
+	NSLOCTEXT("Contexts", "StaticMeshEditor", "StaticMesh Editor"), // Localized context name for displaying
+	"LevelEditor", // Parent
+	FEditorStyle::GetStyleSetName() // Icon Style Set
+)
+{}
+
+void FPlasticSourceControlMenuCommands::RegisterCommands()
+{
+	UI_COMMAND(PlasticSync, "Sync/Update Workspace", "Update all files in the workspace to the latest version.", EUserInterfaceActionType::Button, FInputChord());
+}
+
+
 void FPlasticSourceControlMenu::Register()
 {
+	FPlasticSourceControlMenuCommands::Register();
+
+	// TODO BindActions() dedicated method
+	{
+		CommandList = MakeShareable(new FUICommandList);
+
+		CommandList->MapAction(
+			FPlasticSourceControlMenuCommands::Get().PlasticSync,
+			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::SyncProjectClicked),
+			FCanExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::IsSourceControlConnected)
+		);
+	}
+
 	// Register the menu extension with the level editor
 #if ENGINE_MAJOR_VERSION == 4
 	if (FLevelEditorModule* LevelEditorModule = FModuleManager::GetModulePtr<FLevelEditorModule>("LevelEditor"))
@@ -48,9 +77,16 @@ void FPlasticSourceControlMenu::Register()
 		UToolMenu* SourceControlMenu = ToolMenus->ExtendMenu("StatusBar.ToolBar.SourceControl");
 		FToolMenuSection& Section = SourceControlMenu->AddSection("PlasticSourceControlActions", LOCTEXT("SourceControlMenuHeadingActions", "Plastic SCM"), FToolMenuInsert(NAME_None, EToolMenuInsertType::First));
 
+///  	return UToolMenus::Get()->GenerateWidget("StatusBar.ToolBar.SourceControl", FToolMenuContext(FPlasticSourceControlMenu::ActionList));
+
 		AddMenuExtension(Section);
 	}
 #endif
+
+	/* TODO See how to add an icon to the source control menu or just before/after it
+	FToolMenuSection& Section = InMenu->AddSection("WidgetTools");
+	Section.InsertPosition = FToolMenuInsert("SourceControl", EToolMenuInsertType::After);
+	*/
 }
 
 void FPlasticSourceControlMenu::Unregister()
@@ -159,8 +195,6 @@ TArray<UPackage*> FPlasticSourceControlMenu::UnlinkPackages(const TArray<FString
 
 void FPlasticSourceControlMenu::ReloadPackages(TArray<UPackage*>& InPackagesToReload)
 {
-	UE_LOG(LogSourceControl, Log, TEXT("Reloading %d Packages..."), InPackagesToReload.Num());
-
 	// Syncing may have deleted some packages, so we need to unload those rather than re-load them...
 	TArray<UPackage*> PackagesToUnload;
 	InPackagesToReload.RemoveAll([&](UPackage* InPackage) -> bool
@@ -175,11 +209,18 @@ void FPlasticSourceControlMenu::ReloadPackages(TArray<UPackage*>& InPackagesToRe
 		return false; // keep package
 	});
 
+	UE_LOG(LogSourceControl, Log, TEXT("Reloading %d Packages..."), InPackagesToReload.Num());
+
 	// Hot-reload the new packages...
 	UPackageTools::ReloadPackages(InPackagesToReload);
 
-	// Unload any deleted packages...
-	UPackageTools::UnloadPackages(PackagesToUnload);
+	if (PackagesToUnload.Num() > 0)
+	{
+		UE_LOG(LogSourceControl, Log, TEXT("Unloading %d Packages..."), PackagesToUnload.Num());
+
+		// Unload any deleted packages...
+		UPackageTools::UnloadPackages(PackagesToUnload);
+	}
 }
 
 void FPlasticSourceControlMenu::SyncProjectClicked()
@@ -190,6 +231,7 @@ void FPlasticSourceControlMenu::SyncProjectClicked()
 		if (bSaved)
 		{
 			// Find and Unlink all packages in Content directory to allow to update them
+			// TODO: get pending changes to only unlink and reload incoming packages
 			PackagesToReload = UnlinkPackages(ListAllPackages());
 
 			// Launch a "Sync" operation
@@ -204,9 +246,10 @@ void FPlasticSourceControlMenu::SyncProjectClicked()
 			}
 			else
 			{
-				// Report failure with a notification and Reload all packages
+				// Report failure with a notification
 				DisplayFailureNotification(SyncOperation->GetName());
-				ReloadPackages(PackagesToReload);
+				// TODO try to not reload
+			//	ReloadPackages(PackagesToReload);
 			}
 		}
 		else
@@ -415,6 +458,25 @@ void FPlasticSourceControlMenu::AddMenuExtension(FMenuBuilder& Menu)
 void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 #endif
 {
+	Menu.AddMenuEntryWithCommandList(
+		FPlasticSourceControlMenuCommands::Get().PlasticSync,
+		CommandList,
+		TAttribute<FText>(),
+		TAttribute<FText>(),
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Sync") // TODO use proper style to avoid this
+	);
+
+	/* TODO crash because commands are not registered yet
+	Menu.AddMenuEntry(
+		PlasticSync,
+		TAttribute<FText>(),
+		TAttribute<FText>(),
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Sync")
+	);
+	*/
+
+// TODO: temporarilly disable this sync menu since it crashes on Unreal 5
+#if ENGINE_MAJOR_VERSION == 4
 	Menu.AddMenuEntry(
 #if ENGINE_MAJOR_VERSION == 5
 		"PlasticSync",
@@ -427,6 +489,7 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 			FCanExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::IsSourceControlConnected)
 		)
 	);
+#endif
 
 	Menu.AddMenuEntry(
 #if ENGINE_MAJOR_VERSION == 5
@@ -441,6 +504,8 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 		)
 	);
 
+// TODO: temporarilly disable this revert all menu since it crashes on Unreal 5
+#if ENGINE_MAJOR_VERSION == 4
 	Menu.AddMenuEntry(
 #if ENGINE_MAJOR_VERSION == 5
 		"PlasticRevertAll",
@@ -453,6 +518,7 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 			FCanExecuteAction()
 		)
 	);
+#endif
 
 	Menu.AddMenuEntry(
 #if ENGINE_MAJOR_VERSION == 5

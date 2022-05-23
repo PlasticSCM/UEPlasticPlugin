@@ -2,9 +2,11 @@
 
 #include "PlasticSourceControlMenu.h"
 
+#include "PlasticSourceControlMenuCommands.h"
 #include "PlasticSourceControlModule.h"
-#include "PlasticSourceControlProvider.h"
 #include "PlasticSourceControlOperations.h"
+#include "PlasticSourceControlProvider.h"
+#include "PlasticSourceControlStyle.h"
 
 #include "ISourceControlModule.h"
 #include "ISourceControlOperation.h"
@@ -13,6 +15,9 @@
 #include "Interfaces/IPluginManager.h"
 #include "LevelEditor.h"
 #include "Widgets/Notifications/SNotificationList.h"
+#include "Widgets/Docking/SDockTab.h"
+#include "Widgets/Layout/SBox.h"
+#include "Widgets/Text/STextBlock.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Misc/MessageDialog.h"
@@ -33,10 +38,30 @@
 #include "ToolMenuMisc.h"
 #endif
 
+static const FName PlasticSourceControlTabName("PlasticSourceControl");
+
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 
 void FPlasticSourceControlMenu::Register()
 {
+	FPlasticSourceControlStyle::Initialize();
+	FPlasticSourceControlStyle::ReloadTextures();
+
+	FPlasticSourceControlMenuCommands::Register();
+	
+	PluginCommands = MakeShareable(new FUICommandList);
+
+	PluginCommands->MapAction(
+		FPlasticSourceControlMenuCommands::Get().OpenTab,
+		FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::OpenTabClicked),
+		FCanExecuteAction());
+
+	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FPlasticSourceControlMenu::RegisterMenus));
+	
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(PlasticSourceControlTabName, FOnSpawnTab::CreateRaw(this, &FPlasticSourceControlMenu::OnSpawnPluginTab))
+		.SetDisplayName(LOCTEXT("FPlasticSourceControlTabTitle", "Plastic SCM"))
+		.SetMenuType(ETabSpawnerMenuType::Hidden);
+
 	// Register the menu extension with the level editor
 #if ENGINE_MAJOR_VERSION == 4
 	if (FLevelEditorModule* LevelEditorModule = FModuleManager::GetModulePtr<FLevelEditorModule>("LevelEditor"))
@@ -60,6 +85,16 @@ void FPlasticSourceControlMenu::Register()
 
 void FPlasticSourceControlMenu::Unregister()
 {
+	UToolMenus::UnRegisterStartupCallback(this);
+
+	UToolMenus::UnregisterOwner(this);
+
+	FPlasticSourceControlStyle::Shutdown();
+
+	FPlasticSourceControlMenuCommands::Unregister();
+
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(PlasticSourceControlTabName);
+
 	// Unregister the menu extension from the level editor
 #if ENGINE_MAJOR_VERSION == 4
 	if (FLevelEditorModule* LevelEditorModule = FModuleManager::GetModulePtr<FLevelEditorModule>("LevelEditor"))
@@ -185,6 +220,12 @@ void FPlasticSourceControlMenu::ReloadPackages(TArray<UPackage*>& InPackagesToRe
 
 	// Unload any deleted packages...
 	UPackageTools::UnloadPackages(PackagesToUnload);
+}
+
+
+void FPlasticSourceControlMenu::OpenTabClicked()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(PlasticSourceControlTabName);
 }
 
 void FPlasticSourceControlMenu::SyncProjectClicked()
@@ -435,6 +476,53 @@ void FPlasticSourceControlMenu::OnSourceControlOperationComplete(const FSourceCo
 	else
 	{
 		DisplayFailureNotification(InOperation->GetName());
+	}
+}
+
+TSharedRef<SDockTab> FPlasticSourceControlMenu::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
+{
+	FText WidgetText = FText::Format(
+		LOCTEXT("WindowWidgetText", "Add code to {0} in {1} to override this window's contents"),
+		FText::FromString(TEXT("FPlasticSourceControlMenu::OnSpawnPluginTab")),
+		FText::FromString(TEXT("PlasticSourceControl.cpp"))
+		);
+
+	return SNew(SDockTab)
+		.TabRole(ETabRole::NomadTab)
+		[
+			// TODO Put your tab content here! incoming changes, list of un-merged branches etc (for local changes it might be better to just use the frontend filter of the content browser filter), 
+			SNew(SBox)
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Center)
+			[
+				SNew(STextBlock)
+				.Text(WidgetText)
+			]
+		];
+}
+
+void FPlasticSourceControlMenu::RegisterMenus()
+{
+	// Owner will be used for cleanup in call to UToolMenus::UnregisterOwner
+	FToolMenuOwnerScoped OwnerScoped(this);
+
+	{
+		UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("LevelEditor.MainMenu.Window");
+		{
+			FToolMenuSection& Section = Menu->FindOrAddSection("WindowLayout");
+			Section.AddMenuEntryWithCommandList(FPlasticSourceControlMenuCommands::Get().OpenTab, PluginCommands);
+		}
+	}
+
+	{
+		UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.LevelEditorToolBar.PlayToolBar");
+		{
+			FToolMenuSection& Section = ToolbarMenu->FindOrAddSection("PluginTools");
+			{
+				FToolMenuEntry& Entry = Section.AddEntry(FToolMenuEntry::InitToolBarButton(FPlasticSourceControlMenuCommands::Get().OpenTab));
+				Entry.SetCommandList(PluginCommands);
+			}
+		}
 	}
 }
 

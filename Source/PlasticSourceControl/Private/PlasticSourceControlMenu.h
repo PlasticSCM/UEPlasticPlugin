@@ -17,6 +17,7 @@ public:
 	void Unregister();
 	
 	/** This functions will be bound to appropriate Command. */
+	void OpenTabClicked();
 	void SyncProjectClicked();
 	void RevertUnchangedClicked();
 	void RevertAllClicked();
@@ -32,6 +33,10 @@ private:
 	TArray<UPackage*>	UnlinkPackages(const TArray<FString>& InPackageNames);
 	void				ReloadPackages(TArray<UPackage*>& InPackagesToReload);
 
+	void RegisterMenus();
+
+	TSharedRef<class SDockTab> OnSpawnPluginTab(const class FSpawnTabArgs& SpawnTabArgs);
+
 #if ENGINE_MAJOR_VERSION == 4
 	void AddMenuExtension(FMenuBuilder& Menu);
 
@@ -46,6 +51,8 @@ private:
 	void DisplayFailureNotification(const FName& InOperationName);
 
 private:
+	TSharedPtr<class FUICommandList> PluginCommands;
+
 #if ENGINE_MAJOR_VERSION == 4
 	FDelegateHandle ViewMenuExtenderHandle;
 #endif

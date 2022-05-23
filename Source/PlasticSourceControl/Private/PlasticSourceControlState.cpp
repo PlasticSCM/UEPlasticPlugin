@@ -1,9 +1,10 @@
 // Copyright (c) 2016-2022 Codice Software
 
 #include "PlasticSourceControlState.h"
+
 #include "ISourceControlModule.h"
 #if ENGINE_MAJOR_VERSION == 5
-#include "Styling/AppStyle.h"
+#include "PlasticSourceControlStyle.h"
 #endif
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl.State"
@@ -106,7 +107,7 @@ FName FPlasticSourceControlState::GetIconName() const
 	switch (WorkspaceState)
 	{
 	case EWorkspaceState::CheckedOut:
-	case EWorkspaceState::Replaced: // Merged (waiting for checkin)
+	case EWorkspaceState::Replaced: // Merged (waiting for check-in)
 		return FName("Perforce.CheckedOut");
 	case EWorkspaceState::Added:
 	case EWorkspaceState::Copied:
@@ -148,7 +149,7 @@ FName FPlasticSourceControlState::GetSmallIconName() const
 	switch (WorkspaceState)
 	{
 	case EWorkspaceState::CheckedOut:
-	case EWorkspaceState::Replaced: // Merged (waiting for checkin)
+	case EWorkspaceState::Replaced: // Merged (waiting for check-in)
 		return FName("Perforce.CheckedOut_Small");
 	case EWorkspaceState::Added:
 	case EWorkspaceState::Copied:
@@ -156,9 +157,9 @@ FName FPlasticSourceControlState::GetSmallIconName() const
 	case EWorkspaceState::Moved:
 		return FName("Perforce.Branched_Small");
 	case EWorkspaceState::Deleted:
-	case EWorkspaceState::LocallyDeleted: // TODO: would need a dedicated icon
+	case EWorkspaceState::LocallyDeleted:
 		return FName("Perforce.MarkedForDelete_Small");
-	case EWorkspaceState::Conflicted: // TODO: would need a dedicated icon
+	case EWorkspaceState::Conflicted:
 		return FName("Perforce.NotAtHeadRevision_Small");
 	case EWorkspaceState::LockedByOther:
 		return FName("Perforce.CheckedOutByOtherUser_Small");
@@ -179,38 +180,45 @@ FSlateIcon FPlasticSourceControlState::GetIcon() const
 {
 	if (!IsCurrent())
 	{
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(),"Perforce.NotAtHeadRevision");
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(),"Plastic.NotAtHeadRevision");
 	}
 	else if (WorkspaceState != EWorkspaceState::CheckedOut && WorkspaceState != EWorkspaceState::LockedByOther)
 	{
 		if (IsModifiedInOtherBranch())
 		{
-			return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.ModifiedOtherBranch");
+			return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.ModifiedOtherBranch");
 		}
 	}
 
 	switch (WorkspaceState)
 	{
 	case EWorkspaceState::CheckedOut:
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.CheckedOut");
 	case EWorkspaceState::Replaced: // Merged (waiting for checkin)
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.CheckedOut");
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.Replaced"); // custom
+	case EWorkspaceState::Changed: // Changed but unchecked-out file custom color icon
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.Changed"); // custom
 	case EWorkspaceState::Added:
-	case EWorkspaceState::Copied:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.OpenForAdd");
+	case EWorkspaceState::Copied: // TODO: remove this unused state
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.OpenForAdd");
 	case EWorkspaceState::Moved:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.Branched");
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.Branched");
+// TODO: implement LocallyMoved distinctly than Private, even if it won't always work eg if moved from one folder to another
+//	case EWorkspaceState::LocallyMoved:
+//		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.LocallyMoved"); // custom
 	case EWorkspaceState::Deleted:
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.MarkedForDelete");
 	case EWorkspaceState::LocallyDeleted:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.MarkedForDelete");
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.LocallyDeleted"); // custom
 	case EWorkspaceState::Conflicted:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.NotAtHeadRevision");
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.Conflicted"); // custom
 	case EWorkspaceState::LockedByOther:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.CheckedOutByOtherUser", NAME_None, "SourceControl.LockOverlay");
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.CheckedOutByOtherUser", NAME_None, "SourceControl.LockOverlay");
 	case EWorkspaceState::Private: // Not controlled
-	case EWorkspaceState::Changed: // Changed but unchecked-out file is in a certain way not controlled
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.NotInDepot");
-	case EWorkspaceState::Unknown:
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.NotInDepot");
 	case EWorkspaceState::Ignored:
+		return FSlateIcon(FPlasticSourceControlStyle::GetStyleSetName(), "Plastic.Ignored"); // custom
+	case EWorkspaceState::Unknown:
 	case EWorkspaceState::Controlled: // (Unchanged) same as "Pristine" for Perforce (not checked out) ie no icon
 	default:
 		return FSlateIcon();

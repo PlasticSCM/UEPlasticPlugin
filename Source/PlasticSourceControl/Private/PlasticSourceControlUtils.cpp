@@ -1819,6 +1819,170 @@ bool RunGetChangelists(const EConcurrency::Type InConcurrency, TArray<FPlasticSo
 	return bResult;
 }
 
+EWorkspaceState::Type ShelveFileStatus(const TCHAR InFileStatus)
+{
+	if (InFileStatus == 'A') // Added
+	{
+		return EWorkspaceState::Added;
+	}
+	else if (InFileStatus == 'C') // CheckedOut (or Changed)
+	{
+		return EWorkspaceState::CheckedOut;
+	}
+	else if (InFileStatus == 'D') // Deleted (or Locally Deleted)
+	{
+		return EWorkspaceState::Deleted;
+	}
+	else
+	{
+		UE_LOG(LogSourceControl, Warning, TEXT("Unknown file status '%c'"), InFileStatus);
+		return EWorkspaceState::Unknown;
+	}
+}
+
+bool ParseShelevesResults(const FString InWorkingDirectory, TArray<FString>&& InResults, FPlasticSourceControlChangelistState& InOutChangelistsState)
+{
+	bool bCommandSuccessful = true;
+
+	for (FString& Filename : InResults)
+	{
+		const TCHAR FileStatus = Filename[0];
+		Filename.RightChopInline(3);
+		Filename.LeftInline(Filename.Len() - 1);
+		FString AbsoluteFilename = FPaths::ConvertRelativePathToFull(InWorkingDirectory, MoveTemp(Filename));
+		TSharedRef<FPlasticSourceControlState, ESPMode::ThreadSafe> FileState = MakeShareable(new FPlasticSourceControlState(MoveTemp(AbsoluteFilename)));
+		FileState->WorkspaceState = ShelveFileStatus(FileStatus);
+		InOutChangelistsState.ShelvedFiles.Add(FileState);
+
+		if (FileState->WorkspaceState == EWorkspaceState::Unknown || FileState->LocalFilename.IsEmpty())
+		{
+			bCommandSuccessful = false;
+		}
+	}
+
+	return bCommandSuccessful;
+}
+
+bool RunGetShelveFiles(const EConcurrency::Type InConcurrency, TArray<FPlasticSourceControlChangelistState>& InOutChangelistsStates, TArray<FString>& OutErrorMessages)
+{
+	bool bCommandSuccessful = true;
+
+	const FString& WorkingDirectory = FPlasticSourceControlModule::Get().GetProvider().GetPathToWorkspaceRoot();
+
+	for (FPlasticSourceControlChangelistState& ChangelistState : InOutChangelistsStates)
+	{
+		if (ChangelistState.ShelveId > 0)
+		{
+			TArray<FString> Results;
+			TArray<FString> Parameters;
+			Parameters.Add(FString::Printf(TEXT("sh:%d"), ChangelistState.ShelveId));
+			const bool bDiffSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("diff"), Parameters, TArray<FString>(), InConcurrency, Results, OutErrorMessages);
+			if (bDiffSuccessful)
+			{
+				bCommandSuccessful = ParseShelevesResults(WorkingDirectory, MoveTemp(Results), ChangelistState);
+			}
+		}
+	}
+
+	return bCommandSuccessful;
+}
+
+/**
+ * Parse results of the 'cm find "shelves where owner='me'" --xml --encoding="utf-8"' command.
+ *
+ * Results of the status changelists command looks like that:
+<?xml version="1.0" encoding="utf-8" ?>
+<PLASTICQUERY>
+  <SHELVE>
+	<ID>1376</ID>
+	<SHELVEID>9</SHELVEID>
+	<COMMENT>Unreal Engine 5.1 source github</COMMENT>
+	<DATE>2022-06-30T16:39:55+02:00</DATE>
+	<OWNER>sebastien.rombauts@unity3d.com</OWNER>
+	<REPOSITORY>UE5PlasticPluginDev</REPOSITORY>
+	<REPNAME>UE5PlasticPluginDev</REPNAME>
+	<REPSERVER>test@cloud</REPSERVER>
+	<PARENT>45</PARENT>
+	<GUID>8fbefbcc-81a7-4b81-9b99-b51f4873d09f</GUID>
+  </SHELVE>
+  ...
+</PLASTICQUERY>
+*/
+static bool ParseShelvesResults(const FXmlFile& InXmlResult, TArray<FPlasticSourceControlChangelistState>& InOutChangelistsStates)
+{
+	static const FString PlasticQuery(TEXT("PLASTICQUERY"));
+	static const FString Shelve(TEXT("SHELVE"));
+	static const FString ShelveId(TEXT("SHELVEID"));
+	static const FString Comment(TEXT("COMMENT"));
+
+	const FString& WorkingDirectory = FPlasticSourceControlModule::Get().GetProvider().GetPathToWorkspaceRoot();
+
+	const FXmlNode* PlasticQueryNode = InXmlResult.GetRootNode();
+	if (PlasticQueryNode == nullptr || PlasticQueryNode->GetTag() != PlasticQuery)
+	{
+		return false;
+	}
+
+	const TArray<FXmlNode*>& ShelvesNodes = PlasticQueryNode->GetChildrenNodes();
+	for (const FXmlNode* ShelveNode : ShelvesNodes)
+	{
+		check(ShelveNode);
+		const FXmlNode* ShelveIdNode = ShelveNode->FindChildNode(ShelveId);
+		const FXmlNode* CommentNode = ShelveNode->FindChildNode(Comment);
+		if (ShelveIdNode == nullptr || CommentNode == nullptr)
+		{
+			continue;
+		}
+
+		FString ShelveIdString = ShelveIdNode->GetContent();
+		FString CommentString = CommentNode->GetContent();
+		for (FPlasticSourceControlChangelistState& ChangelistState : InOutChangelistsStates)
+		{
+			FPlasticSourceControlChangelistRef Changelist = StaticCastSharedRef<FPlasticSourceControlChangelist>(ChangelistState.GetChangelist());
+			const FString ChangelistPrefix = FString::Printf(TEXT("Changelist%s: "), *Changelist->GetName());
+			if (CommentString.StartsWith(ChangelistPrefix))
+			{
+				ChangelistState.ShelveId = FCString::Atoi(*ShelveIdString);
+			}
+		}
+	}
+
+	return true;
+}
+
+// TODO OutShelvesFilesStates ?
+bool RunGetShelves(const EConcurrency::Type InConcurrency, TArray<FPlasticSourceControlChangelistState>& InOutChangelistsStates, TArray<FString>& OutErrorMessages)
+{
+	bool bCommandSuccessful;
+
+	FString Results;
+	FString Errors;
+	TArray<FString> Parameters;
+	Parameters.Add(TEXT("\"shelves where owner = 'me'\""));
+	Parameters.Add(TEXT("--xml"));
+	Parameters.Add(TEXT("--encoding=\"utf-8\""));
+	bCommandSuccessful = PlasticSourceControlUtils::RunCommandInternal(TEXT("find"), Parameters, TArray<FString>(), InConcurrency, Results, Errors);
+	if (bCommandSuccessful)
+	{
+		FXmlFile XmlFile;
+		bCommandSuccessful = XmlFile.LoadFile(Results, EConstructMethod::ConstructFromBuffer);
+		if (bCommandSuccessful)
+		{
+			bCommandSuccessful = ParseShelvesResults(XmlFile, InOutChangelistsStates);
+			if (bCommandSuccessful)
+			{
+				bCommandSuccessful = RunGetShelveFiles(InConcurrency, InOutChangelistsStates, OutErrorMessages);
+			}
+		}
+	}
+	if (!Errors.IsEmpty())
+	{
+		OutErrorMessages.Add(MoveTemp(Errors));
+	}
+
+	return bCommandSuccessful;
+}
+
 #endif
 
 bool UpdateCachedStates(TArray<FPlasticSourceControlState>&& InStates)

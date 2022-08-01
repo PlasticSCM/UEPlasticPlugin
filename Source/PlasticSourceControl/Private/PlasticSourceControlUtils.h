@@ -161,6 +161,14 @@ bool RunGetHistory(const bool bInUpdateHistory, TArray<FPlasticSourceControlStat
  */
 bool RunGetChangelists(const EConcurrency::Type InConcurrency, TArray<FPlasticSourceControlChangelistState>& OutChangelistsStates, TArray<TArray<FPlasticSourceControlState>>& OutCLFilesStates, TArray<FString>& OutErrorMessages);
 
+/**
+ * Run find "shelves where owner='me'" and a series of "diff sh:<ShelveId>" and parse their result.
+ * @param	InConcurrency
+ * @param	InOutChangelistsStates	The list of changelists, filled with their shelved files
+ * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
+ */
+bool RunGetShelves(const EConcurrency::Type InConcurrency, TArray<FPlasticSourceControlChangelistState>& InOutChangelistsStates, TArray<FString>& OutErrorMessages);
+
 #endif
 
 /**

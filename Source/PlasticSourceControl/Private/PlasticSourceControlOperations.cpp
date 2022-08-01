@@ -1077,6 +1077,8 @@ bool FPlasticGetPendingChangelistsWorker::Execute(FPlasticSourceControlCommand& 
 						});
 				});
 		}
+
+		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunGetShelves(InCommand.Concurrency, OutChangelistsStates, InCommand.ErrorMessages);
 	}
 
 	bCleanupCache = InCommand.bCommandSuccessful;

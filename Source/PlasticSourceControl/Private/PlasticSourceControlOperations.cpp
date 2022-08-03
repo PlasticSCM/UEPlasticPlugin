@@ -9,13 +9,14 @@
 #include "PlasticSourceControlState.h"
 #include "PlasticSourceControlUtils.h"
 
+#include "Algo/AnyOf.h"
+#include "Algo/NoneOf.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "Async/Async.h"
 #include "HAL/FileManager.h"
+#include "ISourceControlModule.h"
 #include "Misc/Paths.h"
 #include "SourceControlOperations.h"
-#include "ISourceControlModule.h"
-#include "Algo/NoneOf.h"
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 
@@ -48,6 +49,10 @@ void IPlasticSourceControlWorker::RegisterWorkers(FPlasticSourceControlProvider&
 	PlasticSourceControlProvider.RegisterWorker("DeleteChangelist", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteChangelistWorker>));
 	PlasticSourceControlProvider.RegisterWorker("EditChangelist", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticEditChangelistWorker>));
 	PlasticSourceControlProvider.RegisterWorker("MoveToChangelist", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticReopenWorker>));
+
+	PlasticSourceControlProvider.RegisterWorker("Shelve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticShelveWorker>));
+// 	PlasticSourceControlProvider.RegisterWorker("Unshelve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnshelveWorker>));
+// 	PlasticSourceControlProvider.RegisterWorker("DeleteShelved", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteShelveWorker>));
 #endif
 }
 
@@ -1285,13 +1290,10 @@ bool FPlasticNewChangelistWorker::Execute(class FPlasticSourceControlCommand& In
 
 		Operation->SetNewChangelist(MakeShared<FPlasticSourceControlChangelist>(NewChangelist));
 
-		if (InCommand.Files.Num() > 0)
+		InCommand.bCommandSuccessful = MoveFilesToChangelist(GetProvider(), NewChangelist, InCommand.Files, InCommand.Concurrency, InCommand.InfoMessages, InCommand.ErrorMessages);
+		if (InCommand.bCommandSuccessful)
 		{
-			InCommand.bCommandSuccessful = MoveFilesToChangelist(GetProvider(), NewChangelist, InCommand.Files, InCommand.Concurrency, InCommand.InfoMessages, InCommand.ErrorMessages);
-			if (InCommand.bCommandSuccessful)
-			{
-				MovedFiles = InCommand.Files;
-			}
+			MovedFiles = InCommand.Files;
 		}
 	}
 
@@ -1519,6 +1521,283 @@ bool FPlasticReopenWorker::UpdateStates()
 		}
 
 		return ReopenedFiles.Num() > 0;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+
+FName FPlasticShelveWorker::GetName() const
+{
+	return "Shelve";
+}
+
+bool FPlasticShelveWorker::Execute(FPlasticSourceControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticShelveWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FShelve, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FShelve>(InCommand.Operation);
+
+	FPlasticSourceControlChangelist Changelist(InCommand.Changelist);
+
+	TArray<FString> FilesToShelve = InCommand.Files;
+
+	if (InCommand.Changelist.IsInitialized())
+	{
+		TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(InCommand.Changelist);
+
+		// If the command has specified a changelist but no files, then get all files from it
+		if (FilesToShelve.Num() == 0)
+		{
+			FilesToShelve = FileNamesFromFileStates(ChangelistState->Files);
+		}
+		// If the command has specified some files but not all, then ensure all the previous shelved files into the new shelve
+		else if ((FilesToShelve.Num() < ChangelistState->Files.Num()) && (ChangelistState->ShelvedFiles.Num() > 0))
+		{
+			FilesToShelve.Append(FileNamesFromFileStates(ChangelistState->ShelvedFiles));
+		}
+	}
+
+	// If the command is issued on the default changelist, then we should create a new changelist,
+	// move the files to the new changelist (reopen), then shelve the files
+	if (InCommand.Changelist.IsDefault())
+	{
+		// Create a new numbered persistent changelist ala Perforce
+		Changelist = CreatePendingChangelist(GetProvider(), Operation->GetDescription().ToString(), InCommand.Concurrency, InCommand.InfoMessages, InCommand.ErrorMessages);
+		if (Changelist.IsInitialized())
+		{
+			InCommand.bCommandSuccessful = MoveFilesToChangelist(GetProvider(), Changelist, FilesToShelve, InCommand.Concurrency, InCommand.InfoMessages, InCommand.ErrorMessages);
+			if (InCommand.bCommandSuccessful)
+			{
+				MovedFiles = FilesToShelve;
+			}
+		}
+	}
+	else
+	{
+		InCommand.bCommandSuccessful = true;
+	}
+
+	if (InCommand.bCommandSuccessful)
+	{
+		TArray<FString> Results;
+		TArray<FString> Parameters;
+		ChangelistDescription = FString::Printf(TEXT("Changelist%s: %s"), *Changelist.GetName(), *Operation->GetDescription().ToString());
+		const FScopedTempFile CommitMsgFile(ChangelistDescription);
+		Parameters.Add(TEXT("create"));
+		Parameters.Add(FString::Printf(TEXT("-commentsfile=\"%s\""), *FPaths::ConvertRelativePathToFull(CommitMsgFile.GetFilename())));
+		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("shelveset"), Parameters, FilesToShelve, InCommand.Concurrency , Results, InCommand.ErrorMessages);
+		if (InCommand.bCommandSuccessful && Results.Num() > 0)
+		{
+			InChangelistToUpdate = InCommand.Changelist;
+			OutChangelistToUpdate = Changelist;
+			ShelvedFiles = FilesToShelve;
+
+			// Parse the result to update the changelist state with the id of the shelve
+			// "Created shelve sh:12@UE5PlasticPluginDev@test@cloud (mount:'/')"
+			FString CreatedShelveStatus = Results[Results.Num() - 1];
+			if (CreatedShelveStatus.StartsWith(TEXT("Created shelve sh:")))
+			{
+				CreatedShelveStatus.RightChopInline(18);
+				int32 SeparatorIndex;
+				if (CreatedShelveStatus.FindChar(TEXT('@'), SeparatorIndex))
+				{
+					CreatedShelveStatus.LeftInline(SeparatorIndex);
+					ShelveId = FCString::Atoi(*CreatedShelveStatus);
+				}
+			}
+		}
+		else
+		{
+			// If we had to create a new changelist, move the files back to the default changelist
+			// and delete the changelist
+			if (Changelist != InCommand.Changelist)
+			{
+				if (MovedFiles.Num() > 0)
+				{
+					MoveFilesToChangelist(GetProvider(), InCommand.Changelist, MovedFiles, InCommand.Concurrency, InCommand.InfoMessages, InCommand.ErrorMessages);
+				}
+
+				DeleteChangelist(GetProvider(), Changelist, InCommand.Concurrency, InCommand.InfoMessages, InCommand.ErrorMessages);
+			}
+		}
+	}
+
+	return InCommand.bCommandSuccessful;
+}
+
+bool FPlasticShelveWorker::UpdateStates()
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticShelveWorker::UpdateStates);
+
+	TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> DestinationChangelistState = GetProvider().GetStateInternal(OutChangelistToUpdate);
+
+	bool bMovedFiles = false;
+
+	// If we moved files to a new changelist, then we must make sure that the files are properly moved
+	if (InChangelistToUpdate != OutChangelistToUpdate && MovedFiles.Num() > 0)
+	{
+		const FDateTime Now = FDateTime::Now();
+		TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> SourceChangelistState = GetProvider().GetStateInternal(InChangelistToUpdate);
+
+		DestinationChangelistState->Changelist = OutChangelistToUpdate;
+		DestinationChangelistState->Description = ChangelistDescription;
+
+		for (const FString& MovedFile : MovedFiles)
+		{
+			TSharedRef<FPlasticSourceControlState, ESPMode::ThreadSafe> FileState = GetProvider().GetStateInternal(MovedFile);
+
+			SourceChangelistState->Files.Remove(FileState);
+			DestinationChangelistState->Files.Add(FileState);
+			FileState->Changelist = OutChangelistToUpdate;
+			FileState->TimeStamp = Now;
+		}
+
+		bMovedFiles = true;
+	}
+
+	if ((DestinationChangelistState->ShelveId > 0) && (ShelveId != DestinationChangelistState->ShelveId))
+	{
+		// Delete any previous shelve
+		TArray<FString> Results;
+		TArray<FString> Errors;
+		TArray<FString> Parameters;
+		Parameters.Add(TEXT("delete"));
+		Parameters.Add(FString::Printf(TEXT("sh:%d"), DestinationChangelistState->ShelveId));
+		PlasticSourceControlUtils::RunCommand(TEXT("shelveset"), Parameters, TArray<FString>(), EConcurrency::Synchronous, Results, Errors);
+	}
+	DestinationChangelistState->ShelveId = ShelveId;
+
+	DestinationChangelistState->ShelvedFiles.Empty();
+	for (const FString& ShelvedFile : ShelvedFiles)
+	{
+		TSharedRef<FPlasticSourceControlState, ESPMode::ThreadSafe> FileState = GetProvider().GetStateInternal(ShelvedFile);
+		DestinationChangelistState->ShelvedFiles.AddUnique(FileState);
+	}
+
+	return bMovedFiles || ShelvedFiles.Num() > 0;
+}
+
+
+FName FPlasticDeleteShelveWorker::GetName() const
+{
+	return "DeleteShelved";
+}
+
+bool FPlasticDeleteShelveWorker::Execute(FPlasticSourceControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticDeleteShelveWorker::Execute);
+
+	/* TODO
+
+	TArray<FString> Parameters;
+	Parameters.Add(TEXT("-d")); // -d is delete
+	Parameters.Add(TEXT("-c"));
+	Parameters.Add(InCommand.Changelist.ToString());
+
+	FP4RecordSet Records;
+	Connection.RunCommand(TEXT("shelve"), Parameters, InCommand.Files, InCommand.ResultInfo.ErrorMessages, FOnIsCancelled::CreateRaw(&InCommand, &FPlasticSourceControlCommand::IsCanceled), InCommand.bConnectionDropped);
+	InCommand.bCommandSuccessful = (InCommand.ResultInfo.ErrorMessages.Num() == 0);
+
+	if (InCommand.bCommandSuccessful)
+	{
+		ChangelistToUpdate = InCommand.Changelist;
+		FilesToRemove = InCommand.Files;
+	}
+	*/
+
+	return InCommand.bCommandSuccessful;
+}
+
+bool FPlasticDeleteShelveWorker::UpdateStates()
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticDeleteShelveWorker::UpdateStates);
+
+	if (ChangelistToUpdate.IsInitialized())
+	{
+		TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(ChangelistToUpdate);
+
+		if (FilesToRemove.Num() > 0)
+		{
+			return ChangelistState->ShelvedFiles.RemoveAll([this](FSourceControlStateRef& State) -> bool
+				{
+					return Algo::AnyOf(FilesToRemove, [&State](auto& File) {
+						return State->GetFilename() == File;
+					});
+				}) > 0;
+		}
+		else
+		{
+			bool bHadShelvedFiles = (ChangelistState->ShelvedFiles.Num() > 0);
+			ChangelistState->ShelvedFiles.Reset();
+			return bHadShelvedFiles;
+		}
+	}
+	else
+	{
+		return false;
+	}
+}
+
+
+FName FPlasticUnshelveWorker::GetName() const
+{
+	return "Unshelve";
+}
+
+bool FPlasticUnshelveWorker::Execute(FPlasticSourceControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticUnshelveWorker::Execute);
+
+	TArray<FString> Parameters;
+
+	Parameters.Add(TEXT("-s")); // unshelve from source changelist
+	Parameters.Add(InCommand.Changelist.GetName()); // current changelist
+
+	/* TODO
+
+	// Note: unshelve can succeed partially.
+	InCommand.bCommandSuccessful = Connection.RunCommand(TEXT("unshelve"), Parameters, InCommand.Files, InCommand.ResultInfo.ErrorMessages, FOnIsCancelled::CreateRaw(&InCommand, &FPlasticSourceControlCommand::IsCanceled), InCommand.bConnectionDropped);
+		
+	if (InCommand.bCommandSuccessful && Records.Num() > 0)
+	{
+		// At this point, the records contain the list of files from the depot that were unshelved
+		// however they contain only the depot file equivalency; considering that some files might not be in the cache yet,
+		// it is simpler to do a full update of the changelist files.
+		ChangelistToUpdate = InCommand.Changelist;
+		GetOpenedFilesInChangelist(Connection, InCommand, ChangelistToUpdate, ChangelistFilesStates);
+	}
+	*/
+	return InCommand.bCommandSuccessful;
+}
+
+bool FPlasticUnshelveWorker::UpdateStates()
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticUnshelveWorker::UpdateStates);
+
+	if (ChangelistToUpdate.IsInitialized() && ChangelistFilesStates.Num() > 0)
+	{
+		const FDateTime Now = FDateTime::Now();
+
+		TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(ChangelistToUpdate);
+
+		ChangelistState->Files.Reset(ChangelistFilesStates.Num());
+		for (const auto& FileState : ChangelistFilesStates)
+		{
+			TSharedRef<FPlasticSourceControlState, ESPMode::ThreadSafe> CachedFileState = GetProvider().GetStateInternal(FileState.LocalFilename);
+			// Don't override "fileinfo" information and the potential LockedByOther state
+			if (CachedFileState->WorkspaceState != EWorkspaceState::LockedByOther)
+			{
+				CachedFileState->WorkspaceState = FileState.WorkspaceState;
+			}
+			CachedFileState->Changelist = ChangelistToUpdate;
+			ChangelistState->Files.AddUnique(CachedFileState);
+		}
+
+		return true;
 	}
 	else
 	{

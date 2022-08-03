@@ -396,4 +396,75 @@ protected:
 	FPlasticSourceControlChangelist DestinationChangelist;
 };
 
+class FPlasticShelveWorker final : public IPlasticSourceControlWorker
+{
+public:
+	explicit FPlasticShelveWorker(FPlasticSourceControlProvider& InSourceControlProvider)
+		: IPlasticSourceControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticShelveWorker() = default;
+
+	// IPlasticSourceControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(FPlasticSourceControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+
+protected:
+	int32 ShelveId = 0;
+
+	TArray<FString> ShelvedFiles;
+
+	/** Reopened files (if shelving from the Default Changelist) */
+	TArray<FString> MovedFiles;
+
+	/** Changelist description if needed */
+	FString ChangelistDescription;
+
+	/** Changelist(s) to be updated */
+	FPlasticSourceControlChangelist InChangelistToUpdate;
+	FPlasticSourceControlChangelist OutChangelistToUpdate;
+};
+
+class FPlasticDeleteShelveWorker final : public IPlasticSourceControlWorker
+{
+public:
+	explicit FPlasticDeleteShelveWorker(FPlasticSourceControlProvider& InSourceControlProvider)
+		: IPlasticSourceControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticDeleteShelveWorker() = default;
+
+	// IPlasticSourceControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(FPlasticSourceControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+
+protected:
+	/** List of files to remove from shelved files in changelist state */
+	TArray<FString> FilesToRemove;
+
+	/** Changelist to be updated */
+	FPlasticSourceControlChangelist ChangelistToUpdate;
+};
+
+class FPlasticUnshelveWorker : public IPlasticSourceControlWorker
+{
+public:
+	explicit FPlasticUnshelveWorker(FPlasticSourceControlProvider& InSourceControlProvider)
+		: IPlasticSourceControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticUnshelveWorker() = default;
+
+	// IPlasticSourceControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(FPlasticSourceControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+
+protected:
+	/** Changelist to be updated */
+	FPlasticSourceControlChangelist ChangelistToUpdate;
+
+	/** List of files states after update */
+	TArray<FPlasticSourceControlState> ChangelistFilesStates;
+};
+
 #endif

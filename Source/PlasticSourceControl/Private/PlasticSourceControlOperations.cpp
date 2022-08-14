@@ -1694,14 +1694,14 @@ bool FPlasticDeleteShelveWorker::Execute(FPlasticSourceControlCommand& InCommand
 
 	TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(InCommand.Changelist);
 
-	if (ChangelistState->ShelvedFiles.Num() == InCommand.Files.Num())
+	if (InCommand.Files.Num() < ChangelistState->ShelvedFiles.Num())
 	{
-		/* TODO don't delete anything if not all files are selected (or none?)
-		InCommand.bCommandSuccessful = Algo::AllOf(InCommand.Files, [&ChangelistState->ShelvedFiles](auto& File)
-			{
-				return State->GetFilename() == File;
-			});
-		*/
+		// Don't delete the shelve if not all files are selected (since we cannot edit shelves (yet))
+		InCommand.ErrorMessages.Add(TEXT("Cannot delete a selection of files from a shelve. Delete them all at once."));
+		InCommand.bCommandSuccessful = false;
+	}
+	else
+	{
 		InCommand.bCommandSuccessful = true;
 	}
 

@@ -9,6 +9,7 @@
 #include "PlasticSourceControlState.h"
 #include "PlasticSourceControlUtils.h"
 
+#include "Algo/AllOf.h"
 #include "Algo/AnyOf.h"
 #include "Algo/NoneOf.h"
 #include "AssetRegistry/AssetRegistryModule.h"
@@ -52,7 +53,7 @@ void IPlasticSourceControlWorker::RegisterWorkers(FPlasticSourceControlProvider&
 
 	PlasticSourceControlProvider.RegisterWorker("Shelve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticShelveWorker>));
 // 	PlasticSourceControlProvider.RegisterWorker("Unshelve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnshelveWorker>));
-// 	PlasticSourceControlProvider.RegisterWorker("DeleteShelved", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteShelveWorker>));
+ 	PlasticSourceControlProvider.RegisterWorker("DeleteShelved", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteShelveWorker>));
 #endif
 }
 
@@ -1691,23 +1692,32 @@ bool FPlasticDeleteShelveWorker::Execute(FPlasticSourceControlCommand& InCommand
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticDeleteShelveWorker::Execute);
 
-	/* TODO
+	TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(InCommand.Changelist);
 
-	TArray<FString> Parameters;
-	Parameters.Add(TEXT("-d")); // -d is delete
-	Parameters.Add(TEXT("-c"));
-	Parameters.Add(InCommand.Changelist.ToString());
-
-	FP4RecordSet Records;
-	Connection.RunCommand(TEXT("shelve"), Parameters, InCommand.Files, InCommand.ResultInfo.ErrorMessages, FOnIsCancelled::CreateRaw(&InCommand, &FPlasticSourceControlCommand::IsCanceled), InCommand.bConnectionDropped);
-	InCommand.bCommandSuccessful = (InCommand.ResultInfo.ErrorMessages.Num() == 0);
+	if (ChangelistState->ShelvedFiles.Num() == InCommand.Files.Num())
+	{
+		/* TODO don't delete anything if not all files are selected (or none?)
+		InCommand.bCommandSuccessful = Algo::AllOf(InCommand.Files, [&ChangelistState->ShelvedFiles](auto& File)
+			{
+				return State->GetFilename() == File;
+			});
+		*/
+		InCommand.bCommandSuccessful = true;
+	}
 
 	if (InCommand.bCommandSuccessful)
 	{
-		ChangelistToUpdate = InCommand.Changelist;
-		FilesToRemove = InCommand.Files;
+		TArray<FString> Parameters;
+		Parameters.Add(TEXT("delete"));
+		Parameters.Add(FString::Printf(TEXT("sh:%d"), ChangelistState->ShelveId));
+		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("shelveset"), Parameters, TArray<FString>(), InCommand.Concurrency, InCommand.InfoMessages, InCommand.ErrorMessages);
+
+		if (InCommand.bCommandSuccessful)
+		{
+			ChangelistToUpdate = InCommand.Changelist;
+			FilesToRemove = InCommand.Files;
+		}
 	}
-	*/
 
 	return InCommand.bCommandSuccessful;
 }

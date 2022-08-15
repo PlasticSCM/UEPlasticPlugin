@@ -52,7 +52,7 @@ void IPlasticSourceControlWorker::RegisterWorkers(FPlasticSourceControlProvider&
 	PlasticSourceControlProvider.RegisterWorker("MoveToChangelist", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticReopenWorker>));
 
 	PlasticSourceControlProvider.RegisterWorker("Shelve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticShelveWorker>));
-// 	PlasticSourceControlProvider.RegisterWorker("Unshelve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnshelveWorker>));
+ 	PlasticSourceControlProvider.RegisterWorker("Unshelve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnshelveWorker>));
  	PlasticSourceControlProvider.RegisterWorker("DeleteShelved", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteShelveWorker>));
 #endif
 }
@@ -1762,25 +1762,44 @@ bool FPlasticUnshelveWorker::Execute(FPlasticSourceControlCommand& InCommand)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticUnshelveWorker::Execute);
 
-	TArray<FString> Parameters;
+	TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(InCommand.Changelist);
 
-	Parameters.Add(TEXT("-s")); // unshelve from source changelist
-	Parameters.Add(InCommand.Changelist.GetName()); // current changelist
+	if (InCommand.Files.Num() < ChangelistState->ShelvedFiles.Num())
+	{
+		// Don't unshelve the files if they are not all selected (since we cannot apply part of a shelve (yet))
+		InCommand.ErrorMessages.Add(TEXT("Cannot unshelve a selection of files from a shelve. Unshelve them all at once."));
+		InCommand.bCommandSuccessful = false;
+	}
+	else
+	{
+		InCommand.bCommandSuccessful = true;
+	}
 
-	/* TODO
+	// TODO don't unshelve files if files are already modified in the workspace
+	// TODO before trying to unshelve, we also need to unlink the files so they can get overriden by Plastic SCM and then reload them afterward
+
+	if (InCommand.bCommandSuccessful)
+	{
+		TArray<FString> Parameters;
+		Parameters.Add(TEXT("apply"));
+		Parameters.Add(FString::Printf(TEXT("sh:%d"), ChangelistState->ShelveId));
+		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("shelveset"), Parameters, TArray<FString>(), InCommand.Concurrency, InCommand.InfoMessages, InCommand.ErrorMessages);
+	}
 
 	// Note: unshelve can succeed partially.
-	InCommand.bCommandSuccessful = Connection.RunCommand(TEXT("unshelve"), Parameters, InCommand.Files, InCommand.ResultInfo.ErrorMessages, FOnIsCancelled::CreateRaw(&InCommand, &FPlasticSourceControlCommand::IsCanceled), InCommand.bConnectionDropped);
-		
-	if (InCommand.bCommandSuccessful && Records.Num() > 0)
+	if (InCommand.bCommandSuccessful)
 	{
 		// At this point, the records contain the list of files from the depot that were unshelved
 		// however they contain only the depot file equivalency; considering that some files might not be in the cache yet,
 		// it is simpler to do a full update of the changelist files.
+// TODO not true for us at this stage
+//		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunGetChangelists(InCommand.Concurrency, OutChangelistsStates, OutCLFilesStates, InCommand.ErrorMessages);
+
 		ChangelistToUpdate = InCommand.Changelist;
-		GetOpenedFilesInChangelist(Connection, InCommand, ChangelistToUpdate, ChangelistFilesStates);
+		// TODO:
+		ChangelistFilesStates;
 	}
-	*/
+
 	return InCommand.bCommandSuccessful;
 }
 

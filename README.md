@@ -184,7 +184,8 @@ There are 3 settings available at the moment:
 Unreal Engine allows you to configure Editor behaviors. In particular:
 
  - **Tools for diffing text**
-   - Configure the external diff tool needed to compare revisions of assets that are not Blueprints (eg Materials)
+   - Configure the external diff tool needed to compare text revisions of assets that are not Blueprints (eg Materials)
+   - set `mergetool.exe` (from C:\Program Files\PlasticSCM5\client\)
  - **Prompt for Checkout on Asset Modification**
    - Trigger a notification "N files need Checkout" with a link to checkout the asset(s) as soon as a change is made to an asset (without even saving it).
  - **Automatically Checkout on Asset Modification**
@@ -195,6 +196,9 @@ Unreal Engine allows you to configure Editor behaviors. In particular:
    - Share the Source Control Settings ini files between all projects.
 
 ![Editor Preferences - Source Control](Screenshots/UEPlasticPlugin-EditorPreferencesSourceControl.png)
+
+TODO: merge tool
+C:\Program Files\PlasticSCM5\client\mergetool.exe
 
 ### Working in Editor
 
@@ -443,19 +447,22 @@ To configure a text diff for any uasset (not only Blueprints) use this command i
 This version here is the development version, so it always contains additional fixes, performance improvements or new features compared to the one integrated in Engine.
 
 ### Version 1.6.2 2022/08/26 for UE 5.0.3/Github 5.1.x and UE 4.27.2:
- - manage connection to the server
- - show current branch name and CL in status text
- - display status icons to show controlled/checked-out/added/deleted/private/changed/ignored/not-up-to-date files
- - display locked files, and by who
- - branches support, to check outdated files vs. remote across multiple branches
- - add, duplicate a file
- - move/rename a file or a folder
- - revert modifications of a file (works best with the "Content Hot-Reload" option since UE4.15)
- - check-in a set of files with a multi-line UTF-8 comment
+ - maintain a **connection** to the server (using a background cm shell)
+ - **status tooltip** above source control menu shows current branch name and CL
+ - overlay assets in content browser with **status icons**
+   - for local controlled/checked-out/added/deleted/private/changed/ignored/conflicted in content browser
+   - as well as locked files, and by who
+   - not-up-to-date **repository status**
+   - and changed-elsewhere **branches status**, checking file revisions across multiple branches
+ - **add** a file, or copy/duplicate
+ - **move**/rename a file (or all files in a folder) where the Editor add a File Redirector (check [Redirectors](#redirectors))
+ - **revert** modifications of a file (works best with the "Content Hot-Reload" option since UE4.15)
+ - **check-in** a set of files with a multi-line UTF-8 comment
  - migrate (copy) an asset between two projects if both are using Plastic SCM
- - delete file (but no way to check-in them, see known issues below)
- - update workspace to latest head (Sync command)
- - show history of a file
+ - **delete** file (but no way to check-in them, see known issues below)
+ - **update workspace** to latest head (Sync command)
+   TODO: bugs in UE5
+ - show **history** of a file
  - visual diff of a blueprint against depot or between previous versions of a file
  - Changelists in Unreal Engine 5: create, edit, move files, delete (no shelves yet)
  - One Files Per Actor (OFPA) in Unreal Engine 5: status batching to execute only one operation for all files in all subfolders
@@ -473,6 +480,7 @@ This version here is the development version, so it always contains additional f
  - Toggle verbose logs from the Source Control settings UI
  - Run 'cm' CLI commands directly from the Unreal Editor Console, Blueprints of C++ code.
  - Use custom icons on UE5.1 for files locally Changed (not checked-out), locally Deleted, Conflicted and Ignored
+ - Support Plastic SCM **SetFilesAsReadOnly** option from the client.conf to work like Perforce with read-only flags on files not checked-out
  - Windows only
 
 ### Feature Requests

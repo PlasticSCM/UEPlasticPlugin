@@ -77,6 +77,7 @@ public:
 			RepSpec = MoveTemp(InState.RepSpec);
 			DepotRevisionChangeset = InState.DepotRevisionChangeset;
 			LocalRevisionChangeset = InState.LocalRevisionChangeset;
+			Hash = MoveTemp(InState.Hash);
 
 			HeadBranch = MoveTemp(InState.HeadBranch);
 			HeadAction = MoveTemp(InState.HeadAction);
@@ -181,6 +182,9 @@ public:
 
 	/** Latest revision number at which a file was synced to before being edited */
 	int LocalRevisionChangeset = INVALID_REVISION;
+
+	/** The hash of the file at this revision (MD5 by default) */
+	FString Hash;
 
 	/** Original name in case of a Moved/Renamed file */
 	FString MovedFrom;

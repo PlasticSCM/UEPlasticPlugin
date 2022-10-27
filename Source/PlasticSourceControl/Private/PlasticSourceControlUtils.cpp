@@ -633,7 +633,7 @@ static bool RunStatus(const FString& InDir, TArray<FString>&& InFiles, const ECo
 	return bResult;
 }
 
-// Parse the fileinfo output format "{RevisionChangeset};{RevisionHeadChangeset};{RepSpec};{LockedBy};{LockedWhere}"
+// Parse the fileinfo output format "{RevisionChangeset};{RevisionHeadChangeset};{RepSpec};{LockedBy};{LockedWhere};{Hash}"
 // for example "40;41;repo@server:port;srombauts;UEPlasticPluginDev"
 class FPlasticFileinfoParser
 {
@@ -642,13 +642,14 @@ public:
 	{
 		TArray<FString> Fileinfos;
 		const int32 NbElmts = InResult.ParseIntoArray(Fileinfos, TEXT(";"), false); // Don't cull empty values in csv
-		if (NbElmts == 5)
+		if (NbElmts == 6)
 		{
 			RevisionChangeset = FCString::Atoi(*Fileinfos[0]);
 			RevisionHeadChangeset = FCString::Atoi(*Fileinfos[1]);
 			RepSpec = MoveTemp(Fileinfos[2]);
 			LockedBy = UserNameToDisplayName(MoveTemp(Fileinfos[3]));
 			LockedWhere = MoveTemp(Fileinfos[4]);
+			Hash = MoveTemp(Fileinfos[5]);
 		}
 	}
 
@@ -657,9 +658,10 @@ public:
 	FString RepSpec;
 	FString LockedBy;
 	FString LockedWhere;
+	FString Hash;
 };
 
-/** Parse the array of strings result of a 'cm fileinfo --format="{RevisionChangeset};{RevisionHeadChangeset};{RepSpec};{LockedBy};{LockedWhere}"' command
+/** Parse the array of strings result of a 'cm fileinfo --format="{RevisionChangeset};{RevisionHeadChangeset};{RepSpec};{LockedBy};{LockedWhere};{Hash}"' command
  *
  * Example cm fileinfo results:
 16;16;;
@@ -684,9 +686,10 @@ static void ParseFileinfoResults(const TArray<FString>& InResults, TArray<FPlast
 
 		FileState.LocalRevisionChangeset = FileinfoParser.RevisionChangeset;
 		FileState.DepotRevisionChangeset = FileinfoParser.RevisionHeadChangeset;
-		FileState.RepSpec = FileinfoParser.RepSpec;
+		FileState.RepSpec = MoveTemp(FileinfoParser.RepSpec);
 		FileState.LockedBy = MoveTemp(FileinfoParser.LockedBy);
 		FileState.LockedWhere = MoveTemp(FileinfoParser.LockedWhere);
+		FileState.Hash = MoveTemp(FileinfoParser.Hash);
 
 		// If a file is locked but not checked-out locally (or moved/renamed) this means it is locked by someone else or elsewhere
 		if ((FileState.WorkspaceState != EWorkspaceState::CheckedOut) && (FileState.WorkspaceState != EWorkspaceState::Moved) && !FileState.LockedBy.IsEmpty())
@@ -763,7 +766,7 @@ static bool RunFileinfo(const bool bInWholeDirectory, const bool bInUpdateHistor
 		TArray<FString> Results;
 		TArray<FString> ErrorMessages;
 		TArray<FString> Parameters;
-		Parameters.Add(TEXT("--format=\"{RevisionChangeset};{RevisionHeadChangeset};{RepSpec};{LockedBy};{LockedWhere}\""));
+		Parameters.Add(TEXT("--format=\"{RevisionChangeset};{RevisionHeadChangeset};{RepSpec};{LockedBy};{LockedWhere};{Hash}\""));
 		bResult = RunCommand(TEXT("fileinfo"), Parameters, SelectedFiles, InConcurrency, Results, ErrorMessages);
 		OutErrorMessages.Append(MoveTemp(ErrorMessages));
 		if (bResult)
@@ -1145,6 +1148,7 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 	static const FString ChangesetNumber(TEXT("ChangesetNumber"));
 	static const FString Owner(TEXT("Owner"));
 	static const FString Comment(TEXT("Comment"));
+	static const FString Hash(TEXT("Hash"));
 
 	const FXmlNode* RevisionHistoriesResultNode = InXmlResult.GetRootNode();
 	if (RevisionHistoriesResultNode == nullptr || RevisionHistoriesResultNode->GetTag() != RevisionHistoriesResult)
@@ -1265,6 +1269,10 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 				if (const FXmlNode* BranchNode = RevisionNode->FindChildNode(Branch))
 				{
 					SourceControlRevision->Branch = BranchNode->GetContent();
+				}
+				if (const FXmlNode* HashNode = RevisionNode->FindChildNode(Hash))
+				{
+					SourceControlRevision->Hash = HashNode->GetContent();
 				}
 
 				// Detect and skip more recent changesets on other branches (ie above the RevisionHeadChangeset)

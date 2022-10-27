@@ -76,6 +76,9 @@ public:
 
 	/** The size of the file at this revision */
 	int32 FileSize;
+
+	/** The hash of the file at this revision (MD5 by default) */
+	FString Hash;
 };
 
 /** History composed of the last 100 revisions of the file */

@@ -443,12 +443,14 @@ bool FPlasticSourceControlProvider::UsesFileRevisions() const
 
 TOptional<bool> FPlasticSourceControlProvider::IsAtLatestRevision() const
 {
-	return TOptional<bool>(); // NOTE: used by code in UE5's Status Bar but currently dormant as far as I can tell
+	// @note Experimental, hidden behind an setting in XxxEditor.ini [SourceControlSettings] DisplaySourceControlSyncStatus=true
+	return bIsAtLatestRevision;
 }
 
 TOptional<int> FPlasticSourceControlProvider::GetNumLocalChanges() const
 {
-	return TOptional<int>(); // NOTE: used by code in UE5's Status Bar but currently dormant as far as I can tell
+	// @note Experimental, hidden behind an setting in XxxEditor.ini [SourceControlSettings] DisplaySourceControlCheckInStatus=true
+	return NumLocalChanges;
 }
 
 TSharedPtr<IPlasticSourceControlWorker, ESPMode::ThreadSafe> FPlasticSourceControlProvider::CreateWorker(const FName& InOperationName)
@@ -570,10 +572,38 @@ void FPlasticSourceControlProvider::Tick()
 			// let command update the states of any files
 			bStatesUpdated |= Command.Worker->UpdateStates();
 
+			if (bStatesUpdated)
+			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticSourceControlProvider::GetNumLocalChanges);
+
+				// TODO this implementation is garbage, only works if the user browse to a folder where some assets are outdated
+				// => or at least this should just be for detections in between the periodic call to merge
+				// TODO: let's trigger a specific light workspace status update periodically in the background (but only execute it if there is no other source control activity, that is, relaunch the timer on every activity)
+				// TODO: let's trigger a merge periodically in the background to check if there is any incoming changeset
+				if (StateCache.Num() > 1)
+				{
+					int LocalChanges = 0;
+					bIsAtLatestRevision = true;
+
+					for (const auto& State : StateCache)
+					{
+						if (State.Value->IsModified() || State.Value->WorkspaceState == EWorkspaceState::Private)
+							LocalChanges++;
+						else if (!State.Value->IsCurrent())
+							bIsAtLatestRevision = false;
+					}
+
+					NumLocalChanges = LocalChanges;
+				}
+
+				// TODO TEST
+				bIsAtLatestRevision = false;
+			}
+
 			// dump any messages to output log
 			OutputCommandMessages(Command);
 
-			if (Command.Files.Num())
+			if (Command.Files.Num() > 1)
 			{
 				UE_LOG(LogSourceControl, Log, TEXT("%s of %d files processed in %.3lfs"), *Command.Operation->GetName().ToString(), Command.Files.Num(), (FPlatformTime::Seconds() - Command.StartTimestamp));
 			}

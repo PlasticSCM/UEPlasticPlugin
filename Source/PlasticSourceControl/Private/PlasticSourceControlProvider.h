@@ -256,11 +256,14 @@ private:
 	TMap<FPlasticSourceControlChangelist, TSharedRef<class FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> > ChangelistsStateCache;
 #endif
 
+	TOptional<bool> bIsAtLatestRevision;
+	TOptional<int> NumLocalChanges;
+
 	/** The currently registered source control operations */
 	TMap<FName, FGetPlasticSourceControlWorker> WorkersMap;
 
 	/** Queue for commands given by the main thread */
-	TArray < FPlasticSourceControlCommand* > CommandQueue;
+	TArray <FPlasticSourceControlCommand*> CommandQueue;
 
 	/** For notifying when the source control states in the cache have changed */
 	FSourceControlStateChanged OnSourceControlStateChanged;

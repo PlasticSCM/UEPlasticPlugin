@@ -18,6 +18,7 @@
 #include "SourceControlOperations.h"
 #include "ISourceControlModule.h"
 #include "Algo/NoneOf.h"
+#include "PackageTools.h"
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 
@@ -1135,22 +1136,70 @@ bool FPlasticResolveWorker::Execute(FPlasticSourceControlCommand& InCommand)
 	{
 		auto State = GetProvider().GetStateInternal(File);
 
-		// To resolve the conflict, merge the file by keeping it like it is on file system
 		// TODO: according to documentation, this cannot work for cherry-picking
+
+		// To resolve the conflict, merge the file by keeping it like it is on file system
 		// merge cs:2@repo@url:port --merge --keepdestination "/path/to/file"
 
 		// Use Merge Parameters obtained in the UpdateStatus operation
 		TArray<FString> Parameters = State->PendingMergeParameters;
 		Parameters.Add(TEXT("--merge"));
+		// TODO: investigate if this is really what it is about
+		// => why would the resolve fail if it's about keeping it as-is on the filesystem?
 		Parameters.Add(TEXT("--keepdestination"));
+		Parameters.Add(TEXT("--nointeractiveresolution"));
+		Parameters.Add(TEXT("--machinereadable"));
 
 		TArray<FString> OneFile;
 		OneFile.Add(State->PendingMergeFilename);
 
 		UE_LOG(LogSourceControl, Log, TEXT("resolve %s"), *State->PendingMergeFilename);
 
+		TArray<UPackage*> PackagesToReload;
+
+		FString PackageName;
+		FString FailureReason;
+		if (!FPackageName::TryConvertFilenameToLongPackageName(File, PackageName, &FailureReason))
+		{
+			FMessageLog("SourceControl").Error(FText::FromString(FailureReason));
+		}
+
+		// Detach the linkers of any loaded packages so that SCC can overwrite the files...
+		// Note: this will only find packages loaded in memory
+		if (UPackage* Package = FindPackage(nullptr, *PackageName))
+		{
+			PackagesToReload.Emplace(Package);
+			
+			// Note: Requires AsyncTask to call ResetLoaders() on the Game Thread
+			const TSharedRef<TPromise<void>, ESPMode::ThreadSafe> Promise = MakeShareable(new TPromise<void>());
+			AsyncTask(ENamedThreads::GameThread, [Promise, Package]()
+			{
+				if (!Package->IsFullyLoaded())
+				{
+					FlushAsyncLoading();
+					Package->FullyLoad();
+				}
+				ResetLoaders(Package);
+				Promise->SetValue();
+			});
+			Promise->GetFuture().Get();
+		}
+		// else not loaded in memory, nothing to unlink nor reload!
+		
 		// Mark the conflicted file as resolved
 		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("merge"), Parameters, OneFile, InCommand.InfoMessages, InCommand.ErrorMessages);
+
+		/* NOT needed?
+		// Hot-reload the package...
+		// Note: require AsyncTask to call ReloadPackages() on the Game Thread
+		const TSharedRef<TPromise<void>, ESPMode::ThreadSafe> Promise = MakeShareable(new TPromise<void>());
+		AsyncTask(ENamedThreads::GameThread, [Promise, PackagesToReload]()
+		{
+			UPackageTools::ReloadPackages(PackagesToReload);
+			Promise->SetValue();
+		});
+		Promise->GetFuture().Get();
+		*/
 	}
 
 	// now update the status of our files

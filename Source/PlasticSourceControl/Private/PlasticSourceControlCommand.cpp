@@ -1,4 +1,4 @@
-// Copyright Unity Technologies
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "PlasticSourceControlCommand.h"
 #include "PlasticSourceControlModule.h"

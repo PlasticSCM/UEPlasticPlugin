@@ -1,4 +1,4 @@
-// Copyright Unity Technologies
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #if ENGINE_MAJOR_VERSION == 5
 

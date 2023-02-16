@@ -1,7 +1,5 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
-#if ENGINE_MAJOR_VERSION == 5
-
 #include "PlasticSourceControlChangelistState.h"
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl.ChangelistState"
@@ -54,5 +52,3 @@ FSourceControlChangelistRef FPlasticSourceControlChangelistState::GetChangelist(
 }
 
 #undef LOCTEXT_NAMESPACE
-
-#endif

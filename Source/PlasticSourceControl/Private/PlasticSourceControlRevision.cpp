@@ -13,19 +13,12 @@
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 
-#if ENGINE_MAJOR_VERSION == 4
-bool FPlasticSourceControlRevision::Get(FString& InOutFilename) const
-#elif ENGINE_MAJOR_VERSION == 5
 bool FPlasticSourceControlRevision::Get(FString& InOutFilename, EConcurrency::Type InConcurrency /* = EConcurrency::Synchronous */) const
-#endif
 {
-#if ENGINE_MAJOR_VERSION == 5
 	if (InConcurrency != EConcurrency::Synchronous)
 	{
 		UE_LOG(LogSourceControl, Warning, TEXT("Only EConcurrency::Synchronous is tested/supported for this operation."));
 	}
-#endif
-
 
 	// if a filename for the temp file wasn't supplied generate a unique-ish one
 	if (InOutFilename.Len() == 0)

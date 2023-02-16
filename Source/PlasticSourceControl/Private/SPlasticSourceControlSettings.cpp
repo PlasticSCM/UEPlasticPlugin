@@ -23,22 +23,13 @@
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 
 #define LOCTEXT_NAMESPACE "SPlasticSourceControlSettings"
 
 void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 {
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	const FSlateFontInfo Font = FAppStyle::GetFontStyle(TEXT("SourceControl.LoginWindow.Font"));
-#else
-	const FSlateFontInfo Font = FEditorStyle::GetFontStyle(TEXT("SourceControl.LoginWindow.Font"));
-#endif
 
 	bAutoCreateIgnoreFile = CanAutoCreateIgnoreFile();
 	bAutoInitialCommit = true;
@@ -53,12 +44,6 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
-#if ENGINE_MAJOR_VERSION == 4
-	SNew(SBorder)
-	.BorderImage(FEditorStyle::GetBrush("DetailsView.CategoryBottom"))
-	.Padding(FMargin(0.0f, 3.0f, 0.0f, 0.0f))
-	[
-#endif
 		SNew(SVerticalBox)
 		// Versions (Plugin & Plastic SCM) useful eg to help diagnose issues from screenshots
 		+SVerticalBox::Slot()
@@ -385,9 +370,6 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 				.HAlign(HAlign_Center)
 			]
 		]
-#if ENGINE_MAJOR_VERSION == 4
-	]
-#endif
 	];
 }
 
@@ -653,11 +635,7 @@ void SPlasticSourceControlSettings::DisplaySuccessNotification(const FName& InOp
 	const FText NotificationText = FText::Format(LOCTEXT("InitWorkspace_Success", "{0} operation was successful!"), FText::FromName(InOperationName));
 	FNotificationInfo Info(NotificationText);
 	Info.bUseSuccessFailIcons = true;
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	Info.Image = FAppStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#else
-	Info.Image = FEditorStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#endif
 	FSlateNotificationManager::Get().AddNotification(Info);
 	UE_LOG(LogSourceControl, Verbose, TEXT("%s"), *NotificationText.ToString());
 }

@@ -83,7 +83,6 @@ static TArray<UPackage*> ListPackagesToReload(const TArray<FString>& InFiles)
 {
 	TArray<UPackage*> LoadedPackages = FileNamesToLoadedPackages(InFiles);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// Detects if some packages to reload are part of the current map
 	// (ie assets within __ExternalActors__ or __ExternalObjects__ from the new One File Per Actor (OFPA) in UE5)
 	// in which case the current map need to be reloaded, so it needs to be added to the list of packages if not already there
@@ -124,7 +123,6 @@ static TArray<UPackage*> ListPackagesToReload(const TArray<FString>& InFiles)
 			}
 		}
 	}
-#endif
 
 	return LoadedPackages;
 }

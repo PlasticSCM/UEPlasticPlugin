@@ -5,8 +5,6 @@
 #include "CoreMinimal.h"
 #include "PlasticSourceControlRevision.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-
 class FPlasticSourceControlChangelistState;
 class FPlasticSourceControlCommand;
 class FPlasticSourceControlState;
@@ -166,8 +164,6 @@ bool RunGetHistory(const bool bInUpdateHistory, TArray<FPlasticSourceControlStat
  */
 bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages);
 
-#if ENGINE_MAJOR_VERSION == 5
-
 /**
  * Run a Plastic "status --changelist --xml" and parse its XML result.
  * @param	OutChangelistsStates	The list of changelists (without their files)
@@ -190,8 +186,6 @@ bool RunGetShelves(TArray<FPlasticSourceControlChangelistState>& InOutChangelist
  * @param	InShelveStatus			The status of the file
  */
 void AddShelvedFileToChangelist(FPlasticSourceControlChangelistState& InOutChangelistsState, FString&& InFilename, EWorkspaceState::Type InShelveStatus);
-
-#endif
 
 /**
  * Helper function for various commands to update cached states.

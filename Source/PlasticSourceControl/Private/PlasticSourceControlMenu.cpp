@@ -12,14 +12,11 @@
 
 #include "Interfaces/IPluginManager.h"
 #include "LevelEditor.h"
+#include "UObject/Linker.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
 #include "Misc/MessageDialog.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 
 #include "PackageUtils.h"
 #include "FileHelpers.h"
@@ -27,26 +24,15 @@
 
 #include "Logging/MessageLog.h"
 
-#if ENGINE_MAJOR_VERSION == 5
 #include "ToolMenus.h"
 #include "ToolMenuContext.h"
 #include "ToolMenuMisc.h"
-#endif
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 
 void FPlasticSourceControlMenu::Register()
 {
 	// Register the menu extension with the level editor
-#if ENGINE_MAJOR_VERSION == 4
-	if (FLevelEditorModule* LevelEditorModule = FModuleManager::GetModulePtr<FLevelEditorModule>("LevelEditor"))
-	{
-		FLevelEditorModule::FLevelEditorMenuExtender ViewMenuExtender = FLevelEditorModule::FLevelEditorMenuExtender::CreateRaw(this, &FPlasticSourceControlMenu::OnExtendLevelEditorViewMenu);
-		auto& MenuExtenders = LevelEditorModule->GetAllLevelEditorToolbarSourceControlMenuExtenders();
-		MenuExtenders.Add(ViewMenuExtender);
-		ViewMenuExtenderHandle = MenuExtenders.Last().GetHandle();
-	}
-#elif ENGINE_MAJOR_VERSION == 5
 	FToolMenuOwnerScoped SourceControlMenuOwner("PlasticSourceControlMenu");
 	if (UToolMenus* ToolMenus = UToolMenus::Get())
 	{
@@ -55,23 +41,15 @@ void FPlasticSourceControlMenu::Register()
 
 		AddMenuExtension(Section);
 	}
-#endif
 }
 
 void FPlasticSourceControlMenu::Unregister()
 {
 	// Unregister the menu extension from the level editor
-#if ENGINE_MAJOR_VERSION == 4
-	if (FLevelEditorModule* LevelEditorModule = FModuleManager::GetModulePtr<FLevelEditorModule>("LevelEditor"))
-	{
-		LevelEditorModule->GetAllLevelEditorToolbarSourceControlMenuExtenders().RemoveAll([=](const FLevelEditorModule::FLevelEditorMenuExtender& Extender) { return Extender.GetHandle() == ViewMenuExtenderHandle; });
-	}
-#elif ENGINE_MAJOR_VERSION == 5
 	if (UToolMenus* ToolMenus = UToolMenus::Get())
 	{
 		UToolMenus::Get()->UnregisterOwnerByName("PlasticSourceControlMenu");
 	}
-#endif
 }
 
 bool FPlasticSourceControlMenu::IsSourceControlConnected() const
@@ -335,11 +313,7 @@ void FPlasticSourceControlMenu::DisplaySucessNotification(const FName& InOperati
 	);
 	FNotificationInfo Info(NotificationText);
 	Info.bUseSuccessFailIcons = true;
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	Info.Image = FAppStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#else
-	Info.Image = FEditorStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#endif
 	FSlateNotificationManager::Get().AddNotification(Info);
 	UE_LOG(LogSourceControl, Log, TEXT("%s"), *NotificationText.ToString());
 }
@@ -385,23 +359,13 @@ void FPlasticSourceControlMenu::OnSourceControlOperationComplete(const FSourceCo
 	}
 }
 
-#if ENGINE_MAJOR_VERSION == 4
-void FPlasticSourceControlMenu::AddMenuExtension(FMenuBuilder& Menu)
-#elif ENGINE_MAJOR_VERSION == 5
 void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
-#endif
 {
 	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
 		"PlasticSync",
-#endif
 		LOCTEXT("PlasticSync",			"Sync/Update Workspace"),
 		LOCTEXT("PlasticSyncTooltip",	"Update the workspace to the latest changeset of the branch, and reload all affected assets."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Sync"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Sync"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::SyncProjectClicked),
 			FCanExecuteAction()
@@ -409,16 +373,10 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 	);
 
 	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
 		"PlasticRevertUnchanged",
-#endif
 		LOCTEXT("PlasticRevertUnchanged",			"Revert Unchanged"),
 		LOCTEXT("PlasticRevertUnchangedTooltip",	"Revert checked-out but unchanged files in the workspace."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Revert"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Revert"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::RevertUnchangedClicked),
 			FCanExecuteAction()
@@ -426,16 +384,10 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 	);
 
 	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
 		"PlasticRevertAll",
-#endif
 		LOCTEXT("PlasticRevertAll",			"Revert All"),
 		LOCTEXT("PlasticRevertAllTooltip",	"Revert all files in the workspace to their controlled/unchanged state."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Revert"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Revert"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::RevertAllClicked),
 			FCanExecuteAction()
@@ -443,67 +395,43 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 	);
 
 	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
 		"PlasticRefresh",
-#endif
 		LOCTEXT("PlasticRefresh",			"Refresh"),
 		LOCTEXT("PlasticRefreshTooltip",	"Update the local source control status of all files in the workspace (no expensive checks for locks or changes on other branches)."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Refresh"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Refresh"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::RefreshClicked),
 			FCanExecuteAction()
 		)
 	);
 
-#if ENGINE_MAJOR_VERSION == 5
 	Menu.AddMenuEntry(
 		"SourceControlEditorPreferences",
 		LOCTEXT("SourceControlEditorPreferences", "Editor Preferences - Source Control"),
 		LOCTEXT("SourceControlEditorPreferencesTooltip", "Open the Load & Save section with Source Control in the Editor Preferences."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "EditorPreferences.TabIcon"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "EditorPreferences.TabIcon"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlEditorPreferences),
 			FCanExecuteAction()
 		)
 	);
-#endif
 
-#if ENGINE_MAJOR_VERSION == 5
 	Menu.AddMenuEntry(
 		"SourceControlProjectSettings",
 		LOCTEXT("SourceControlProjectSettings",			"Project Settings - Source Control"),
 		LOCTEXT("SourceControlProjectSettingsTooltip",	"Open the Source Control section in the Project Settings."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "ProjectSettings.TabIcon"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "ProjectSettings.TabIcon"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlProjectSettings),
 			FCanExecuteAction()
 		)
 	);
-#endif
 
 	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
 		"PlasticProjectSettings",
-#endif
 		LOCTEXT("PlasticProjectSettings",			"Project Settings - Source Control - Plastic SCM"),
 		LOCTEXT("PlasticProjectSettingsTooltip",	"Open the Plastic SCM section in the Project Settings."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "ProjectSettings.TabIcon"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "ProjectSettings.TabIcon"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlPlasticScmProjectSettings),
 			FCanExecuteAction()
@@ -511,18 +439,10 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 	);
 
 	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
 		"PlasticDocsURL",
-#endif
 		LOCTEXT("PlasticDocsURL",			"Plugin's Documentation"),
 		LOCTEXT("PlasticDocsURLTooltip",	"Visit documentation of the plugin on Github."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Documentation"),
-#elif ENGINE_MAJOR_VERSION == 5
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "Icons.Documentation"),
-#elif ENGINE_MAJOR_VERSION == 4
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.BrowseDocumentation"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitDocsURLClicked),
 			FCanExecuteAction()
@@ -530,38 +450,15 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 	);
 
 	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
 		"PlasticSupportURL",
-#endif
 		LOCTEXT("PlasticSupportURL",		"Plastic SCM Support"),
 		LOCTEXT("PlasticSupportURLTooltip",	"Visit official support for Plastic SCM."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Support"),
-#elif ENGINE_MAJOR_VERSION == 5
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "Icons.Support"),
-#elif ENGINE_MAJOR_VERSION == 4
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.BrowseDocumentation"),
-#endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitSupportURLClicked),
 			FCanExecuteAction()
 		)
 	);
 }
-
-#if ENGINE_MAJOR_VERSION == 4
-TSharedRef<FExtender> FPlasticSourceControlMenu::OnExtendLevelEditorViewMenu(const TSharedRef<FUICommandList> CommandList)
-{
-	TSharedRef<FExtender> Extender(new FExtender());
-
-	Extender->AddMenuExtension(
-		"SourceControlActions",
-		EExtensionHook::After,
-		nullptr,
-		FMenuExtensionDelegate::CreateRaw(this, &FPlasticSourceControlMenu::AddMenuExtension));
-
-	return Extender;
-}
-#endif
 
 #undef LOCTEXT_NAMESPACE

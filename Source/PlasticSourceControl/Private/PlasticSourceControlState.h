@@ -6,12 +6,7 @@
 #include "ISourceControlState.h"
 #include "ISourceControlRevision.h"
 #include "PlasticSourceControlRevision.h"
-
-#include "Runtime/Launch/Resources/Version.h"
-
-#if ENGINE_MAJOR_VERSION == 5
 #include "PlasticSourceControlChangelist.h"
-#endif
 
 namespace EWorkspaceState
 {
@@ -113,12 +108,7 @@ public:
 	virtual TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FindHistoryRevision(const FString& InRevision) const override;
 	virtual TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> GetBaseRevForMerge() const override;
 	virtual TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> GetCurrentRevision() const; /* override	NOTE: added in UE5.2 */
-#if ENGINE_MAJOR_VERSION == 4
-	virtual FName GetIconName() const override;
-	virtual FName GetSmallIconName() const override;
-#elif ENGINE_MAJOR_VERSION == 5
 	virtual FSlateIcon GetIcon() const override;
-#endif
 	virtual FText GetDisplayName() const override;
 	virtual FText GetDisplayTooltip() const override;
 	virtual const FString& GetFilename() const override;
@@ -186,10 +176,8 @@ public:
 	/** Original name in case of a Moved/Renamed file */
 	FString MovedFrom;
 
-#if ENGINE_MAJOR_VERSION == 5
 	/** Changelist containing this file */
 	FPlasticSourceControlChangelist Changelist;
-#endif
 
 	/** The timestamp of the last update */
 	FDateTime TimeStamp = 0;

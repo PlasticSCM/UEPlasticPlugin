@@ -3,9 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Runtime/Launch/Resources/Version.h"
-
-#if ENGINE_MAJOR_VERSION == 5
 
 #include "ISourceControlChangelist.h"
 
@@ -25,12 +22,10 @@ public:
 
 	FPlasticSourceControlChangelist(const FPlasticSourceControlChangelist& InOther) = default;
 
-#if ENGINE_MINOR_VERSION >= 1
 	virtual bool CanDelete() const override
 	{
 		return !IsDefault();
 	}
-#endif
 
 	bool operator==(const FPlasticSourceControlChangelist& InOther) const
 	{
@@ -82,5 +77,3 @@ private:
 };
 
 typedef TSharedRef<class FPlasticSourceControlChangelist, ESPMode::ThreadSafe> FPlasticSourceControlChangelistRef;
-
-#endif

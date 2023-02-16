@@ -3,9 +3,7 @@
 #include "PlasticSourceControlState.h"
 #include "PlasticSourceControlProjectSettings.h"
 #include "ISourceControlModule.h"
-#if ENGINE_MAJOR_VERSION == 5
 #include "Styling/AppStyle.h"
-#endif
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl.State"
 
@@ -101,114 +99,6 @@ TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FPlasticSourceCont
 	return nullptr;
 }
 
-#if ENGINE_MAJOR_VERSION == 4
-
-FName FPlasticSourceControlState::GetIconName() const
-{
-	if (!IsCurrent())
-	{
-		return FName("Perforce.NotAtHeadRevision");
-	}
-	else if (WorkspaceState != EWorkspaceState::CheckedOut)
-	{
-		if (IsCheckedOutOther())
-		{
-			return FName("Perforce.CheckedOutByOtherUser");
-		}
-		else if (IsModifiedInOtherBranch())
-		{
-			return FName("Perforce.ModifiedOtherBranch");
-		}
-	}
-
-	switch (WorkspaceState)
-	{
-	case EWorkspaceState::CheckedOut:
-	case EWorkspaceState::Replaced: // Merged (waiting for checkin)
-		return FName("Perforce.CheckedOut");
-	case EWorkspaceState::Added:
-	case EWorkspaceState::Copied:
-		return FName("Perforce.OpenForAdd");
-	case EWorkspaceState::Moved:
-		return FName("Perforce.Branched");
-	case EWorkspaceState::Deleted: // Deleted & Missing files does not show in Content Browser
-	case EWorkspaceState::LocallyDeleted: // Deleted & Missing files does not show in Content Browser
-		return FName("Perforce.MarkedForDelete");
-	case EWorkspaceState::Conflicted:
-		return FName("Perforce.NotAtHeadRevision");
-	case EWorkspaceState::Private: // Not controlled
-		return FName("Perforce.NotInDepot");
-	case EWorkspaceState::Changed: // Changed but unchecked-out file is in a certain way not controlled - TODO: would need a dedicated icon
-		if (GetDefault<UPlasticSourceControlProjectSettings>()->bPromptForCheckoutOnChange)
-		{
-			return FName("Perforce.NotInDepot");
-		}
-		else
-		{
-			return FName("Perforce.CheckedOut");
-		}
-	case EWorkspaceState::Unknown:
-	case EWorkspaceState::Ignored:
-	case EWorkspaceState::Controlled: // (Unchanged) same as "Pristine" for Perforce (not checked out) ie no icon
-	default:
-		return NAME_None;
-	}
-}
-
-FName FPlasticSourceControlState::GetSmallIconName() const
-{
-	if (!IsCurrent())
-	{
-		return FName("Perforce.NotAtHeadRevision_Small");
-	}
-	else if (WorkspaceState != EWorkspaceState::CheckedOut)
-	{
-		if (IsCheckedOutOther())
-		{
-			return FName("Perforce.CheckedOutByOtherUser_Small");
-		}
-		else if (IsModifiedInOtherBranch())
-		{
-			return FName("Perforce.ModifiedOtherBranch_Small");
-		}
-	}
-
-	switch (WorkspaceState)
-	{
-	case EWorkspaceState::CheckedOut:
-	case EWorkspaceState::Replaced: // Merged (waiting for checkin)
-		return FName("Perforce.CheckedOut_Small");
-	case EWorkspaceState::Added:
-	case EWorkspaceState::Copied:
-		return FName("Perforce.OpenForAdd_Small");
-	case EWorkspaceState::Moved:
-		return FName("Perforce.Branched_Small");
-	case EWorkspaceState::Deleted:
-	case EWorkspaceState::LocallyDeleted: // TODO: would need a dedicated icon
-		return FName("Perforce.MarkedForDelete_Small");
-	case EWorkspaceState::Conflicted: // TODO: would need a dedicated icon
-		return FName("Perforce.NotAtHeadRevision_Small");
-	case EWorkspaceState::Private: // Not controlled
-		return FName("Perforce.NotInDepot_Small");
-	case EWorkspaceState::Changed: // Changed but unchecked-out file is in a certain way not controlled - TODO: would need a dedicated icon
-		if (GetDefault<UPlasticSourceControlProjectSettings>()->bPromptForCheckoutOnChange)
-		{
-			return FName("Perforce.NotInDepot_Small");
-		}
-		else
-		{
-			return FName("Perforce.CheckedOut_Small");
-		}
-	case EWorkspaceState::Unknown:
-	case EWorkspaceState::Ignored:
-	case EWorkspaceState::Controlled: // (Unchanged) same as "Pristine" for Perforce (not checked out) ie no icon
-	default:
-		return NAME_None;
-	}
-}
-
-#elif ENGINE_MAJOR_VERSION == 5
-
 FSlateIcon FPlasticSourceControlState::GetIcon() const
 {
 	if (!IsCurrent())
@@ -226,8 +116,6 @@ FSlateIcon FPlasticSourceControlState::GetIcon() const
 			return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.ModifiedOtherBranch");
 		}
 	}
-
-#if ENGINE_MINOR_VERSION >= 1 // UE5.1+
 
 	switch (WorkspaceState)
 	{
@@ -256,46 +144,7 @@ FSlateIcon FPlasticSourceControlState::GetIcon() const
 	default:
 		return FSlateIcon();
 	}
-
-#else // UE5.0
-
-	switch (WorkspaceState)
-	{
-	case EWorkspaceState::CheckedOut:
-	case EWorkspaceState::Replaced: // Merged (waiting for checkin)
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.CheckedOut");
-	case EWorkspaceState::Added:
-	case EWorkspaceState::Copied:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.OpenForAdd");
-	case EWorkspaceState::Moved:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.Branched");
-	case EWorkspaceState::Deleted:
-	case EWorkspaceState::LocallyDeleted:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.MarkedForDelete");
-	case EWorkspaceState::Conflicted:
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.NotAtHeadRevision");
-	case EWorkspaceState::Private: // Not controlled
-		return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.NotInDepot");
-	case EWorkspaceState::Changed: // Changed but unchecked-out file is in a certain way not controlled
-		if (GetDefault<UPlasticSourceControlProjectSettings>()->bPromptForCheckoutOnChange)
-		{
-			return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.NotInDepot");
-		}
-		else
-		{
-			return FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce.CheckedOut");
-		}
-	case EWorkspaceState::Unknown:
-	case EWorkspaceState::Ignored:
-	case EWorkspaceState::Controlled: // (Unchanged) same as "Pristine" for Perforce (not checked out) ie no icon
-	default:
-		return FSlateIcon();
-	}
-
-#endif
 }
-
-#endif
 
 FText FPlasticSourceControlState::GetDisplayName() const
 {

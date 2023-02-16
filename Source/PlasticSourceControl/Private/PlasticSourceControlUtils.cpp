@@ -12,12 +12,7 @@
 #include "PlasticSourceControlVersions.h"
 #include "ISourceControlModule.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 4
-#include "HAL/PlatformFilemanager.h"
-#elif ENGINE_MAJOR_VERSION == 5
 #include "HAL/PlatformFileManager.h"
-#endif
 #include "HAL/PlatformProcess.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -25,10 +20,8 @@
 #include "SoftwareVersion.h"
 #include "ScopedTempFile.h"
 
-#if ENGINE_MAJOR_VERSION == 5
 #include "PlasticSourceControlChangelist.h"
 #include "PlasticSourceControlChangelistState.h"
-#endif
 
 namespace PlasticSourceControlUtils
 {
@@ -1230,11 +1223,7 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 		{
 			if (const FXmlNode* RevisionNode = RevisionNodes[Index])
 			{
-#if ENGINE_MAJOR_VERSION == 4
-				const TSharedRef<FPlasticSourceControlRevision, ESPMode::ThreadSafe> SourceControlRevision = MakeShareable(new FPlasticSourceControlRevision);
-#elif ENGINE_MAJOR_VERSION == 5
 				const TSharedRef<FPlasticSourceControlRevision, ESPMode::ThreadSafe> SourceControlRevision = MakeShared<FPlasticSourceControlRevision>();
-#endif
 				SourceControlRevision->State = &InOutState;
 				SourceControlRevision->Filename = Filename;
 				SourceControlRevision->RevisionId = Index + 1;
@@ -1543,8 +1532,6 @@ bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace,
 
 	return bResult;
 }
-
-#if ENGINE_MAJOR_VERSION == 5
 
 /**
  * Parse results of the 'cm status --changelists --controlledchanged --xml --encoding="utf-8"' command.
@@ -1953,8 +1940,6 @@ bool RunGetShelves(TArray<FPlasticSourceControlChangelistState>& InOutChangelist
 
 	return bCommandSuccessful;
 }
-
-#endif
 
 bool UpdateCachedStates(TArray<FPlasticSourceControlState>&& InStates)
 {

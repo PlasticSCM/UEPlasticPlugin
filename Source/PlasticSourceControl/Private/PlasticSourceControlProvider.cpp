@@ -161,17 +161,12 @@ TSharedRef<FPlasticSourceControlState, ESPMode::ThreadSafe> FPlasticSourceContro
 	else
 	{
 		// cache an unknown state for this item
-#if ENGINE_MAJOR_VERSION == 4
-		TSharedRef<FPlasticSourceControlState, ESPMode::ThreadSafe> NewState = MakeShareable(new FPlasticSourceControlState(FString(InFilename)));
-#elif ENGINE_MAJOR_VERSION == 5
 		TSharedRef<FPlasticSourceControlState, ESPMode::ThreadSafe> NewState = MakeShared<FPlasticSourceControlState>(FString(InFilename));
-#endif
 		StateCache.Add(InFilename, NewState);
 		return NewState;
 	}
 }
 
-#if ENGINE_MAJOR_VERSION == 5
 TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> FPlasticSourceControlProvider::GetStateInternal(const FPlasticSourceControlChangelist& InChangelist)
 {
 	TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe>* State = ChangelistsStateCache.Find(InChangelist);
@@ -188,7 +183,6 @@ TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> FPlasticSo
 		return NewState;
 	}
 }
-#endif
 
 FText FPlasticSourceControlProvider::GetStatusText() const
 {
@@ -285,7 +279,6 @@ ECommandResult::Type FPlasticSourceControlProvider::GetState(const TArray<FStrin
 	return ECommandResult::Succeeded;
 }
 
-#if ENGINE_MAJOR_VERSION == 5
 ECommandResult::Type FPlasticSourceControlProvider::GetState(const TArray<FSourceControlChangelistRef>& InChangelists, TArray<FSourceControlChangelistStateRef>& OutState, EStateCacheUsage::Type InStateCacheUsage)
 {
 	if (!IsEnabled())
@@ -328,7 +321,6 @@ TArray<FSourceControlChangelistStateRef> FPlasticSourceControlProvider::GetCache
 	}
 	return Result;
 }
-#endif
 
 TArray<FSourceControlStateRef> FPlasticSourceControlProvider::GetCachedStateByPredicate(TFunctionRef<bool(const FSourceControlStateRef&)> Predicate) const
 {
@@ -359,11 +351,7 @@ void FPlasticSourceControlProvider::UnregisterSourceControlStateChanged_Handle(F
 	OnSourceControlStateChanged.Remove(Handle);
 }
 
-#if ENGINE_MAJOR_VERSION == 5
-	ECommandResult::Type FPlasticSourceControlProvider::Execute(const FSourceControlOperationRef& InOperation, FSourceControlChangelistPtr InChangelist, const TArray<FString>& InFiles, EConcurrency::Type InConcurrency, const FSourceControlOperationComplete& InOperationCompleteDelegate)
-#else
-	ECommandResult::Type FPlasticSourceControlProvider::Execute(const FSourceControlOperationRef& InOperation, const TArray<FString>& InFiles,	EConcurrency::Type InConcurrency, const FSourceControlOperationComplete& InOperationCompleteDelegate)
-#endif
+ECommandResult::Type FPlasticSourceControlProvider::Execute(const FSourceControlOperationRef& InOperation, FSourceControlChangelistPtr InChangelist, const TArray<FString>& InFiles, EConcurrency::Type InConcurrency, const FSourceControlOperationComplete& InOperationCompleteDelegate)
 {
 	if (!bWorkspaceFound && !(InOperation->GetName() == "Connect") && !(InOperation->GetName() == "MakeWorkspace"))
 	{
@@ -388,10 +376,8 @@ void FPlasticSourceControlProvider::UnregisterSourceControlStateChanged_Handle(F
 	Command->Files = SourceControlHelpers::AbsoluteFilenames(InFiles);
 	Command->OperationCompleteDelegate = InOperationCompleteDelegate;
 
-#if ENGINE_MAJOR_VERSION == 5
 	TSharedPtr<FPlasticSourceControlChangelist, ESPMode::ThreadSafe> ChangelistPtr = StaticCastSharedPtr<FPlasticSourceControlChangelist>(InChangelist);
 	Command->Changelist = ChangelistPtr ? ChangelistPtr.ToSharedRef().Get() : FPlasticSourceControlChangelist();
-#endif
 
 	// fire off operation
 	if (InConcurrency == EConcurrency::Synchronous)
@@ -656,7 +642,6 @@ TArray<TSharedRef<ISourceControlLabel>> FPlasticSourceControlProvider::GetLabels
 	return Tags;
 }
 
-#if ENGINE_MAJOR_VERSION == 5
 TArray<FSourceControlChangelistRef> FPlasticSourceControlProvider::GetChangelists(EStateCacheUsage::Type InStateCacheUsage)
 {
 	if (!IsEnabled())
@@ -676,7 +661,6 @@ TArray<FSourceControlChangelistRef> FPlasticSourceControlProvider::GetChangelist
 	Algo::Transform(ChangelistsStateCache, Changelists, [](const auto& Pair) { return MakeShared<FPlasticSourceControlChangelist, ESPMode::ThreadSafe>(Pair.Key); });
 	return Changelists;
 }
-#endif
 
 #if SOURCE_CONTROL_WITH_SLATE
 TSharedRef<class SWidget> FPlasticSourceControlProvider::MakeSettingsWidget() const
@@ -699,36 +683,12 @@ ECommandResult::Type FPlasticSourceControlProvider::ExecuteSynchronousCommand(FP
 		IssueCommand(InCommand);
 
 		// ... then wait for its completion (thus making it synchronous)
-#if ENGINE_MAJOR_VERSION == 4 || ENGINE_MINOR_VERSION < 1
-		double LastProgressTimestamp = FPlatformTime::Seconds();
-		double ProgressUpdateThreshold = .0;
-#endif
 		while (!InCommand.bExecuteProcessed)
 		{
 			// Tick the command queue and update progress.
 			Tick();
 
-#if ENGINE_MAJOR_VERSION == 4 || ENGINE_MINOR_VERSION < 1
-			const double CurrentTimestamp = FPlatformTime::Seconds();
-			const double ElapsedTime = CurrentTimestamp - LastProgressTimestamp;
-
-			// Note: calling too many times Progress.Tick() crashes the GPU Out of Memory
-			// We need to reduce the number of calls we make, but we don't want to have the progress bar stuttering horribly
-			// So we tart to update it frequently/smoothly, and then we increase the intervals more and more (arithmetic series, with a cap)
-			// in order to reduce the video memory usage for very long operation without visual penalty on quicker daily operations.
-			if (ElapsedTime > ProgressUpdateThreshold)
-			{
-#endif
-				Progress.Tick();
-
-#if ENGINE_MAJOR_VERSION == 4 || ENGINE_MINOR_VERSION < 1
-				LastProgressTimestamp = CurrentTimestamp;
-				if (ProgressUpdateThreshold < 0.25)
-				{
-					ProgressUpdateThreshold += 0.001;
-				}
-			}
-#endif
+			Progress.Tick();
 
 			// Sleep for a bit so we don't busy-wait so much.
 			FPlatformProcess::Sleep(0.01f);

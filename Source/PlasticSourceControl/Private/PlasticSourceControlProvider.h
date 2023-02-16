@@ -37,7 +37,6 @@ public:
 	virtual FDelegateHandle RegisterSourceControlStateChanged_Handle(const FSourceControlStateChanged::FDelegate& SourceControlStateChanged) override;
 	virtual void UnregisterSourceControlStateChanged_Handle(FDelegateHandle Handle) override;
 	virtual ECommandResult::Type Execute(const FSourceControlOperationRef& InOperation, FSourceControlChangelistPtr InChangelist, const TArray<FString>& InFiles, EConcurrency::Type InConcurrency = EConcurrency::Synchronous, const FSourceControlOperationComplete& InOperationCompleteDelegate = FSourceControlOperationComplete() ) override;
-	virtual bool CanExecuteOperation( const FSourceControlOperationRef& InOperation ) const; /* override	NOTE: added in UE5.2 */
 	virtual bool CanCancelOperation(const FSourceControlOperationRef& InOperation) const override;
 	virtual void CancelOperation(const FSourceControlOperationRef& InOperation) override;
 	virtual bool UsesLocalReadOnlyState() const override;

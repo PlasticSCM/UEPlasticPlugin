@@ -140,12 +140,39 @@ bool FPlasticConnectWorker::Execute(FPlasticSourceControlCommand& InCommand)
 				// Now update the status of assets in the Content directory
 				// but only on real (re-)connection (but not each time Login() is called by Rename or Fixup Redirector command to check connection)
 				// and only if enabled in the settings
+				// TODO: this way of checking doesn't work anymore, now that we are initiating the connection earlier, in FPlasticSourceControlProvider::Init()
 				if (!GetProvider().IsAvailable() && GetProvider().AccessSettings().GetUpdateStatusAtStartup())
 				{
 					TArray<FString> ContentDir;
 					ContentDir.Add(FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()));
 					PlasticSourceControlUtils::RunUpdateStatus(ContentDir, PlasticSourceControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 				}
+/* TODO: something like Is First Call, but on the Provider, and reset at Init() or on Close()?
+				static bool bIsFirstCall = true;
+				if (bIsFirstCall)
+				{
+					bIsFirstCall = false;
+					// and only if enabled in the settings
+					// TODO: currently, the RunUpdateStatus() at startup is taking way too long on big project, but not because of Plastic SCM itself, but because of the parsing by the plugin
+					// => let's see if we can warm up the cache of "status" by a background command without any parsing!
+					if (GetProvider().AccessSettings().GetUpdateStatusAtStartup())
+					{
+						TArray<FString> ContentDir;
+						ContentDir.Add(FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()));
+						PlasticSourceControlUtils::RunUpdateStatus(ContentDir, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
+					}
+					else
+					{
+						FString Results, Errors;
+						TArray<FString> Parameters;
+						// NOTE: calling the fast status with --controlledchanged is not enough to warm up the cache of "status", it really need to search for local changes here
+						Parameters.Add(TEXT("--all"));
+						TArray<FString> ContentDir;
+						ContentDir.Add(FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()));
+						PlasticSourceControlUtils::RunCommand(TEXT("status"), Parameters, ContentDir, Results, Errors);
+					}
+				}
+*/
 			}
 			else
 			{

@@ -228,13 +228,20 @@ bool FPlasticCheckOutWorker::Execute(FPlasticSourceControlCommand& InCommand)
 
 	check(InCommand.Operation->GetName() == GetName());
 
+	TArray<FString> Parameters;
+	// Prevent the command to output too much text, it has a performance impact! While it may still be interesting when adding a reasonable low number of assets.
+	if (InCommand.Files.Num() > 1)
+	{
+		Parameters.Add(TEXT("--silent"));
+	}
+
 	if (!GetProvider().IsPartialWorkspace())
 	{
-		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("checkout"), TArray<FString>(), InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
+		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("checkout"), Parameters, InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
 	}
 	else
 	{
-		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("partial checkout"), TArray<FString>(), InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
+		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("partial checkout"), Parameters, InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
 	}
 
 	// now update the status of our files
@@ -374,6 +381,7 @@ bool FPlasticCheckInWorker::Execute(FPlasticSourceControlCommand& InCommand)
 		{
 			TArray<FString> Parameters;
 			Parameters.Add(FString::Printf(TEXT("--commentsfile=\"%s\""), *FPaths::ConvertRelativePathToFull(CommitMsgFile.GetFilename())));
+			// TODO: here it could be an improvement to silence the list of files checked-in, but we need to keep the download progress to prevent our timeout to kill the shell
 			if (!GetProvider().IsPartialWorkspace())
 			{
 				Parameters.Add(TEXT("--all")); // Also files Changed (not CheckedOut) and Moved/Deleted Locally
@@ -484,7 +492,11 @@ bool FPlasticMarkForAddWorker::Execute(FPlasticSourceControlCommand& InCommand)
 	if (InCommand.Files.Num() > 0)
 	{
 		TArray<FString> Parameters;
-		Parameters.Add(TEXT("--parents")); // NOTE: deprecated in 8.0.16.3100 when it became the default https://www.plasticscm.com/download/releasenotes/8.0.16.3100
+		// Prevent the command to output too much text, it has a performance impact! While it may still be interesting when adding a reasonable low number of assets.
+		if (InCommand.Files.Num() > 1)
+		{
+			Parameters.Add(TEXT("--silent"));
+		}
 		// Note: using "?" is a workaround to trigger the Plastic's "SkipIgnored" internal flag meaning "don't add file that are ignored":
 		//          options.SkipIgnored = cla.GetWildCardArguments().Count > 0;
 		//       It's behavior is similar as Subversion:
@@ -542,13 +554,20 @@ bool FPlasticDeleteWorker::Execute(FPlasticSourceControlCommand& InCommand)
 
 	check(InCommand.Operation->GetName() == GetName());
 
+	TArray<FString> Parameters;
+	// Prevent the command to output too much text, it has a performance impact! While it may still be interesting when adding a reasonable low number of assets.
+	if (InCommand.Files.Num() > 1)
+	{
+		Parameters.Add(TEXT("--silent"));
+	}
+
 	if (!GetProvider().IsPartialWorkspace())
 	{
-		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("remove"), TArray<FString>(), InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
+		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("remove"), Parameters, InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
 	}
 	else
 	{
-		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("partial remove"), TArray<FString>(), InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
+		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("partial remove"), Parameters, InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
 	}
 
 	// now update the status of our files
@@ -647,14 +666,20 @@ bool FPlasticRevertWorker::Execute(FPlasticSourceControlCommand& InCommand)
 
 	if (LocallyChangedFiles.Num() > 0)
 	{
+		TArray<FString> Parameters;
+		// Prevent the command to output too much text, it has a performance impact! While it may still be interesting when adding a reasonable low number of assets.
+		if (LocallyChangedFiles.Num() > 1)
+		{
+			Parameters.Add(TEXT("--silent"));
+		}
 		if (!GetProvider().IsPartialWorkspace())
 		{
-			InCommand.bCommandSuccessful &= PlasticSourceControlUtils::RunCommand(TEXT("undochange"), TArray<FString>(), LocallyChangedFiles, InCommand.InfoMessages, InCommand.ErrorMessages);
+			InCommand.bCommandSuccessful &= PlasticSourceControlUtils::RunCommand(TEXT("undochange"), Parameters, LocallyChangedFiles, InCommand.InfoMessages, InCommand.ErrorMessages);
 		}
 		else
 		{
 			// partial undochange doesn't exist in partial mode
-			InCommand.bCommandSuccessful &= PlasticSourceControlUtils::RunCommand(TEXT("partial undo"), TArray<FString>(), LocallyChangedFiles, InCommand.InfoMessages, InCommand.ErrorMessages);
+			InCommand.bCommandSuccessful &= PlasticSourceControlUtils::RunCommand(TEXT("partial undo"), Parameters, LocallyChangedFiles, InCommand.InfoMessages, InCommand.ErrorMessages);
 		}
 	}
 
@@ -664,6 +689,11 @@ bool FPlasticRevertWorker::Execute(FPlasticSourceControlCommand& InCommand)
 		if (bIsSoftRevert)
 		{
 			Parameters.Add(TEXT("--keepchanges"));
+		}
+		// Prevent the command to output too much text, it has a performance impact! While it may still be interesting when adding a reasonable low number of assets.
+		if (CheckedOutFiles.Num() > 1)
+		{
+			Parameters.Add(TEXT("--silent"));
 		}
 
 		// revert the checkout and any changes of the given file in workspace
@@ -723,6 +753,7 @@ bool FPlasticRevertUnchangedWorker::Execute(FPlasticSourceControlCommand& InComm
 
 	TArray<FString> Parameters;
 	Parameters.Add(TEXT("-R"));
+	// Note: "--silent" doesn't have any effect on uncounchanged
 
 	TArray<FString> Files = GetFilesFromCommand(GetProvider(), InCommand);
 
@@ -811,22 +842,28 @@ bool FPlasticRevertAllWorker::Execute(FPlasticSourceControlCommand& InCommand)
 		}
 	}
 
-	TArray<FString> Results;
-	TArray<FString> Parameters;
-	Parameters.Add(TEXT("--all"));
-	// revert the checkout of all files recursively
-	if (!GetProvider().IsPartialWorkspace())
 	{
-		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("undocheckout"), Parameters, TArray<FString>(), Results, InCommand.ErrorMessages);
+		TArray<FString> Results;
+		TArray<FString> Parameters;
+		Parameters.Add(TEXT("--all"));
+		// Prevent the command to output too much text, it has a performance impact! While it may still be interesting when adding a reasonable low number of assets.
+		// NOTE: don't parse the Results, it has too many quirks, uses the list from the status update;
+		// - Renames are not easy to parse without a clean separator in "Origin Destination"
+		// - Files added in folders are not accounted for by "undo", only the folder is listed in the results
+		if (Operation->UpdatedFiles.Num() > 1)
+		{
+			Parameters.Add(TEXT("--silent"));
+		}
+		// revert the checkout of all files recursively
+		if (!GetProvider().IsPartialWorkspace())
+		{
+			InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("undocheckout"), Parameters, TArray<FString>(), Results, InCommand.ErrorMessages);
+		}
+		else
+		{
+			InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("partial undocheckout"), Parameters, TArray<FString>(), Results, InCommand.ErrorMessages);
+		}
 	}
-	else
-	{
-		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("partial undocheckout"), Parameters, TArray<FString>(), Results, InCommand.ErrorMessages);
-	}
-
-	// NOTE: don't parse the Results, it has too many quirks, uses the list from the status update;
-	// - Renames are not easy to parse without a clean separator in "Origin Destination"
-	// - Files added in folders are not accounted for by "undo", only the folder is listed in the results
 
 	// now update the status of the updated files
 	if (Operation->UpdatedFiles.Num())

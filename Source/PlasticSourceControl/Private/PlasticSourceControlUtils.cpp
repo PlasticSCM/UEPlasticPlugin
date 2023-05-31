@@ -1734,7 +1734,7 @@ void AddShelvedFileToChangelist(FPlasticSourceControlChangelistState& InOutChang
 		ShelveState->History.Add(SourceControlRevision);
 	}
 
-	// In case of a Moved file, it would appear twice in the list, so overwrite it if already in
+	// In case of a Moved file, it would appear twice in the list, first as Changed, then as Moved, so overwrite it if already in
 	if (FSourceControlStateRef* ExistingShelveState = InOutChangelistsState.ShelvedFiles.FindByPredicate(
 		[&ShelveState](const FSourceControlStateRef& State)
 		{
@@ -1885,6 +1885,14 @@ static bool ParseShelvesResults(const FXmlFile& InXmlResult, TArray<FPlasticSour
 			{
 				ChangelistState.ShelveId = FCString::Atoi(*ShelveIdString);
 
+				// TODO: let's also amend the Changelist description with the Shelve ID?
+				// I am not sure it makes sense, since it would also show up when trying to edit the changelist description!
+				FString ChangelistShelveIdSuffix = TEXT(" (Shelve ID: ") + ShelveIdString + TEXT(")");
+				if (!ChangelistState.Description.Contains(ChangelistShelveIdSuffix, ESearchCase::CaseSensitive))
+				{
+					ChangelistState.Description = ChangelistState.Description + MoveTemp(ChangelistShelveIdSuffix);
+				}
+
 				if (const FXmlNode* DateNode = ShelveNode->FindChildNode(Date))
 				{
 					const FString& DateIso = DateNode->GetContent();
@@ -1931,7 +1939,7 @@ bool RunGetShelves(TArray<FPlasticSourceControlChangelistState>& InOutChangelist
 }
 
 /**
- * Parse results of the 'cm diff sh:<ShelveId> --format="{status};{baserevid};{path}"' command.
+ * Parse results of the 'cm diff sh:<ShelveId> --format="{status};{revid};{parentrevid};{path}"' command.
  *
  * Results of the diff command looks like that:
 C;666;Content\NewFolder\BP_CheckedOut.uasset
@@ -1939,44 +1947,50 @@ C;666;Content\NewFolder\BP_CheckedOut.uasset
 C;266;"Content\ThirdPerson\Blueprints\BP_ThirdPersonCharacterRenamed.uasset"
 M;-1;"Content\ThirdPerson\Blueprints\BP_ThirdPersonCharacterRenamed.uasset"
 */
-bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InResults, TArray<FPlasticSourceControlRevision>& OutBaseRevisions)
+bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InResults, TArray<FPlasticSourceControlRevision>& OutParentRevisions)
 {
 	bool bCommandSuccessful = true;
 
-	OutBaseRevisions.Reset(InResults.Num());
+	OutParentRevisions.Reset(InResults.Num());
 	for (FString& InResult : InResults)
 	{
 		TArray<FString> ResultElements;
 		ResultElements.Reserve(3);
 		InResult.ParseIntoArray(ResultElements, FILE_STATUS_SEPARATOR, false); // Don't cull empty values in csv
-		if (ResultElements.Num() == 3 && ResultElements[0].Len() == 1)
+		if (ResultElements.Num() == 4 && ResultElements[0].Len() == 1)
 		{
 			EWorkspaceState ShelveState = ParseShelveFileStatus(ResultElements[0][0]);
-			const int32 BaseRevisionId = FCString::Atoi(*ResultElements[1]);
+			const int32 RevisionId = FCString::Atoi(*ResultElements[1]);
+			const int32 ParentRevisionId = FCString::Atoi(*ResultElements[2]);
 			// Remove outer double quotes on filename
-			FString File = MoveTemp(ResultElements[2]);
+			FString File = MoveTemp(ResultElements[3]);
 			File.MidInline(1, File.Len() - 2, false);
 			FString AbsoluteFilename = FPaths::ConvertRelativePathToFull(InWorkspaceRoot, File);
-
-			if (ShelveState == EWorkspaceState::Moved)
-			{
-				// In case of a Moved file, it appears twice in the list, so update the first entry (set as a "Changed" but has the Base Revision Id) and update it with the "Move" status
-				if (FPlasticSourceControlRevision* ExistingShelveRevision = OutBaseRevisions.FindByPredicate(
-					[&AbsoluteFilename](const FPlasticSourceControlRevision& State)
-					{
-						return State.GetFilename().Equals(AbsoluteFilename);
-					}))
-				{
-					ExistingShelveRevision->Action = FileStateToAction(EWorkspaceState::Moved);
-					continue;
-				}
-			}
-
 			FPlasticSourceControlRevision SourceControlRevision;
 			SourceControlRevision.Filename = MoveTemp(AbsoluteFilename);
 			SourceControlRevision.Action = FileStateToAction(ShelveState);
-			SourceControlRevision.RevisionId = BaseRevisionId;
-			OutBaseRevisions.Add(MoveTemp(SourceControlRevision));
+			// Special case for a deleted file, that has no parent revision for whatever reason
+			if (ShelveState == EWorkspaceState::Deleted)
+			{
+				SourceControlRevision.RevisionId = RevisionId;
+			}
+			else
+			{
+				SourceControlRevision.RevisionId = ParentRevisionId;
+			}
+			// In case of a Moved file, it would appear twice in the list, first as Changed, then as Moved, so overwrite it if already in
+			if (FPlasticSourceControlRevision* ExistingShelveRevision = OutParentRevisions.FindByPredicate(
+				[&SourceControlRevision](const FPlasticSourceControlRevision& State)
+				{
+					return State.GetFilename().Equals(SourceControlRevision.GetFilename());
+				}))
+			{
+				*ExistingShelveRevision = SourceControlRevision;
+			}
+			else
+			{
+				OutParentRevisions.Add(MoveTemp(SourceControlRevision));
+			}
 		}
 		else
 		{
@@ -1988,11 +2002,12 @@ bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InR
 }
 
 /**
- * Run for a shelve a "diff sh:<ShelveId> --format='{status};{baserevid};{path}'" and parse the result to list its files.
- * @param	InOutChangelistsStates	The list of changelists, filled with their shelved files
- * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
+ * Run for a shelve a "diff sh:<ShelveId> --format='{status};{revid};{parentrevid};{path}'" and parse the result to list its files.
+ * @param	InShelveId			The shelve to query
+ * @param	OutParentRevisions	The parent revisions of shelved files
+ * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
  */
-bool RunGetShelveFiles(const int32 InShelveId, TArray<FPlasticSourceControlRevision>& OutBaseRevisions, TArray<FString>& OutErrorMessages)
+bool RunGetShelveFiles(const int32 InShelveId, TArray<FPlasticSourceControlRevision>& OutParentRevisions, TArray<FString>& OutErrorMessages)
 {
 	bool bCommandSuccessful = true;
 
@@ -2003,12 +2018,12 @@ bool RunGetShelveFiles(const int32 InShelveId, TArray<FPlasticSourceControlRevis
 		TArray<FString> Results;
 		TArray<FString> Parameters;
 		Parameters.Add(FString::Printf(TEXT("sh:%d"), InShelveId));
-		Parameters.Add(TEXT("--format=\"{status};{baserevid};{path}\""));
+		Parameters.Add(TEXT("--format=\"{status};{revid};{parentrevid};{path}\""));
 		Parameters.Add(TEXT("--encoding=\"utf-8\""));
 		const bool bDiffSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("diff"), Parameters, TArray<FString>(), Results, OutErrorMessages);
 		if (bDiffSuccessful)
 		{
-			bCommandSuccessful = ParseShelveDiffResults(WorkspaceRoot, MoveTemp(Results), OutBaseRevisions);
+			bCommandSuccessful = ParseShelveDiffResults(WorkspaceRoot, MoveTemp(Results), OutParentRevisions);
 		}
 	}
 
@@ -2076,7 +2091,7 @@ static bool ParseShelvesResult(const FXmlFile& InXmlResult, int32& OutShelveId, 
 	return true;
 }
 
-bool RunGetShelve(const int32 InShelveId, FString& OutComment, FDateTime& OutDate, FString& OutOwner, TArray<FPlasticSourceControlRevision>& OutBaseRevisions, TArray<FString>& OutErrorMessages)
+bool RunGetShelve(const int32 InShelveId, FString& OutComment, FDateTime& OutDate, FString& OutOwner, TArray<FPlasticSourceControlRevision>& OutParentRevisions, TArray<FString>& OutErrorMessages)
 {
 	bool bCommandSuccessful;
 
@@ -2097,7 +2112,7 @@ bool RunGetShelve(const int32 InShelveId, FString& OutComment, FDateTime& OutDat
 			bCommandSuccessful = ParseShelvesResult(XmlFile, ShelveId, OutComment, OutDate, OutOwner);
 			if (bCommandSuccessful)
 			{
-				bCommandSuccessful = RunGetShelveFiles(InShelveId, OutBaseRevisions, OutErrorMessages);
+				bCommandSuccessful = RunGetShelveFiles(InShelveId, OutParentRevisions, OutErrorMessages);
 			}
 		}
 	}

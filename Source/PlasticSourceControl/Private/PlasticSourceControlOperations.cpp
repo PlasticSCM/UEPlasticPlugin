@@ -498,7 +498,6 @@ bool FPlasticMarkForAddWorker::Execute(FPlasticSourceControlCommand& InCommand)
 	if (InCommand.Files.Num() > 0)
 	{
 		TArray<FString> Parameters;
-		Parameters.Add(TEXT("--parents")); // NOTE: deprecated in 8.0.16.3100 when it became the default https://www.plasticscm.com/download/releasenotes/8.0.16.3100
 		// Note: using "?" is a workaround to trigger the Plastic's "SkipIgnored" internal flag meaning "don't add file that are ignored":
 		//          options.SkipIgnored = cla.GetWildCardArguments().Count > 0;
 		//       It's behavior is similar as Subversion:

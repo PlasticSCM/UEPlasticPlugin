@@ -513,6 +513,10 @@ bool FPlasticMarkForAddWorker::Execute(FPlasticSourceControlCommand& InCommand)
 			{
 				Parameters.Add(TEXT("--silent"));	// prevents the command to output too much text, it has a performance impact!
 			}
+			else
+			{
+				Parameters.Add(TEXT("--noinfo"));	// doesn't print progress information.
+			}
 		}
 		else
 		{

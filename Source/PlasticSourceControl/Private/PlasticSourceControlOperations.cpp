@@ -498,19 +498,26 @@ bool FPlasticMarkForAddWorker::Execute(FPlasticSourceControlCommand& InCommand)
 	if (InCommand.Files.Num() > 0)
 	{
 		TArray<FString> Parameters;
-		// Note: using "?" is a workaround to trigger the Plastic's "SkipIgnored" internal flag meaning "don't add file that are ignored":
-		//          options.SkipIgnored = cla.GetWildCardArguments().Count > 0;
-		//       It's behavior is similar as Subversion:
-		//          if you explicitly add one file that is ignored, "cm" will happily accept it and add it,
-		//          if you try to add a set of files with a pattern, "cm" will skip the files that are ignored and only add the other ones
-		// TODO: provide an updated version of "cm" with a new flag like --applyignorerules
 		if (AreAllFiles(InCommand.Files))
 		{
-			Parameters.Add(TEXT("?"));	// needed only when used with a list of files
+			// Note: using "?" is a workaround to trigger the Plastic's "SkipIgnored" internal flag meaning "don't add file that are ignored":
+			//          options.SkipIgnored = cla.GetWildCardArguments().Count > 0;
+			//       It's behavior is similar as Subversion:
+			//          if you explicitly add one file that is ignored, "cm" will happily accept it and add it,
+			//          if you try to add a set of files with a pattern, "cm" will skip the files that are ignored and only add the other ones
+			// TODO: provide an updated version of "cm" with a new flag like --applyignorerules
+			Parameters.Add(TEXT("?"));				// needed only when used with a list of files
+
+			// Only log the results when adding a reasonable low number of assets:
+			if (InCommand.Files.Num() > 10)
+			{
+				Parameters.Add(TEXT("--silent"));	// prevents the command to output too much text, it has a performance impact!
+			}
 		}
 		else
 		{
-			Parameters.Add(TEXT("-R"));	// needed only at the time of workspace creation, to add directories recursively
+			Parameters.Add(TEXT("--recursive"));	// needed only at the time of workspace creation, to add directories recursively
+			Parameters.Add(TEXT("--silent"));		// prevents the command to output too much text, it has a performance impact!
 		}
 		if (!GetProvider().IsPartialWorkspace())
 		{

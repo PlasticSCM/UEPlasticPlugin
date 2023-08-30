@@ -19,7 +19,10 @@
 		{
 			"Name": "UnityVersionControl",
 			"Type": "UncookedOnly",
-			"LoadingPhase": "EarliestPossible"
+			"LoadingPhase": "EarliestPossible",
+			"PlatformAllowList": [
+				"Win64"
+			]
 		}
 	]
 }

@@ -677,5 +677,4 @@ All the relevant C++ source code of the plugin reside in one subdirectory `<Proj
 
 ## Copyright
 
-Copyright Unity Technologies
-Developed by Sébastien Rombauts (sebastien.rombauts@gmail.com)
+Copyright (c) 2023 Unity Technologies

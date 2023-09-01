@@ -76,12 +76,12 @@ If you want the latest features, performance improvements and bug fixes that are
         This creates a "Plugins\UEPlasticPlugin\" subdirectory into your project.
         This is the way to go to use Unity Version Control on a specific project,
         and to share the plugin with other team members by adding it to source control.
-        Some users reported they also had to remove the integrated plugin from "Engine\Plugins\Developer\PlasticSourceControl" to avoid a collision.
+        Some users reported they also had to remove the integrated plugin from "Engine\Plugins\Developer\UnityVersionControl" to avoid a collision.
         This is only needed for some specific use case I have not yet identified (eg. on CI/CD, or on Unix OSes).
      2. Unzip the content of the ZIP in the Engine\ directory of UEX.Y directly for all your projects
         (for instance "C:\Program Files\Epic Games\5.1\Engine\")
         This creates a "UEPlasticPlugin" folder into the "Plugins\" subdirectory.
-        Then remove the integrated plugin from "Engine\Plugins\Developer\PlasticSourceControl" to avoid the collision.
+        Then remove the integrated plugin from "Engine\Plugins\Developer\UnityVersionControl" to avoid the collision.
         This is the way to enable Unity Version Control for all Unreal Engine projects on the machine.
  3. Then, launch your Unreal project, click on the Source Control icon "Connect to Source", select "Plastic SCM".
 
@@ -140,7 +140,7 @@ and are saved locally in `Saved\Config\WindowsEditor\SourceControlSettings.ini`.
 
 - BinaryPath: Path to the Unity Version Control Command Line tool 'cm' binary. Default is good if the cli is in the PATH. Can be changed to an absolute path to the cm executable if needed.
 - UpdateStatusAtStartup: Triggers an asynchronous "Update Status" operation at Editor startup. Can take quite some time on big projects, with no source control status available in the meantime.
-- UpdateStatusOtherBranches: Enable Update status to detect more recent changes on other branches in order to display the "Changed In Other Branch" warnings and icon. 
+- UpdateStatusOtherBranches: Enable Update status to detect more recent changes on other branches in order to display the "Changed In Other Branch" warnings and icon.
 - EnableVerboseLogs: Override LogSourceControl default verbosity level to Verbose (except if already set to VeryVerbose).
 
 ##### Add an ignore.conf file
@@ -188,7 +188,7 @@ but it can be useful to set a few settings if different than the defaults:
 [SourceControl.SourceControlSettings]
 Provider=Plastic SCM
 
-[PlasticSourceControl.PlasticSourceControlSettings]
+[UnityVersionControl.UnityVersionControlSettings]
 BinaryPath=cm
 UpdateStatusAtStartup=False
 UpdateStatusOtherBranches=True
@@ -276,7 +276,7 @@ Plastic SCM forums:
 ![Redirector added by a Move](Screenshots/Icons/UEPlasticPlugin-Redirector.png)
 ![Moved/Renamed](Screenshots/Icons/UEPlasticPlugin-Renamed.png)
 
- 5. Locally **Changed** without checkout, or **Private** ie not source controlled 
+ 5. Locally **Changed** without checkout, or **Private** ie not source controlled
  6. **Checked-out** exclusively to prevent others from making modifications (if Locks are enabled on the server)
  7. **Redirector** added by a Move
  8. **Moved** or Renamed
@@ -372,7 +372,7 @@ Tooltip in the Content Browser when an asset has been modified in another branch
 
 Warning when trying to checkout an asset that has been modified in another branch:
 ![Warning on checkout for an asset modified in another branch](Screenshots/UEPlasticPlugin-BranchModification-WarningOnCheckout.png)
- 
+
 Warning when trying to modify an asset that has been modified in another branch:
 ![Warning on modification for an asset modified in another branch](Screenshots/UEPlasticPlugin-BranchModification-WarningOnModification.png)
 
@@ -483,7 +483,7 @@ The command line needs the quoted path to the UnrealEditor.exe, the quoted patch
 
     "C:\Program Files\Epic Games\UE_5.0\Engine\Binaries\Win64\UnrealEditor.exe" "C:\wkspaces\ProjectName\ProjectName.uproject" -diff "@sourcefile" "@destinationfile"
 
-eg: 
+eg:
 
     "C:\Program Files\Epic Games\UE_5.2\Engine\Binaries\Win64\UnrealEditor.exe" "C:\UnitySrc\UE5UnityVCSDevEnv\UE5UnityVCSDevEnv.uproject" -diff "@sourcefile" "@destinationfile"
 
@@ -601,7 +601,7 @@ You can also use the [Github issue-tracker](https://github.com/SRombauts/UEPlast
  3. Describe precisely your issue
  4. Add reproduction steps, if possible on a basic template project
  5. Post log files whenever possible (see [enable debug logs](#enable-debug-logs) to get the most of it)
-    1. Unreal Log file **`<ProjectName>/Saved/Logs/ProjectName.log`** 
+    1. Unreal Log file **`<ProjectName>/Saved/Logs/ProjectName.log`**
     2. cm debug log file typically from **`<LOCALAPPDATA>\plastic4\logs\cm.log.txt`**
 
 ### Use merge requests
@@ -612,60 +612,60 @@ If you want to help, [Github Pull Requests](https://github.com/PlasticSCM/UEPlas
 
 See also [Unreal Engine C++ Coding Standard](https://docs.unrealengine.com/4.27/en-US/ProductionPipelines/DevelopmentSetup/CodingStandard/)
 
-All the relevant C++ source code of the plugin reside in one subdirectory `<ProjectName>/Plugins/UEPlasticPlugin/Source/PlasticSourceControl/Private/`
+All the relevant C++ source code of the plugin reside in one subdirectory `<ProjectName>/Plugins/UEPlasticPlugin/Source/UnityVersionControl/Private/`
 
 ### Implementations of all the Source Control APIs as C++ interfaces
 
- - **PlasticSourceControlProvider**.cpp/.h
-   - `class FPlasticSourceControlProvider : public ISourceControlProvider`
+ - **UnityVersionControlProvider**.cpp/.h
+   - `class FUnityVersionControlProvider : public ISourceControlProvider`
    - implements the high level source control interface with the mechanism around managing workspace states
- - **PlasticSourceControlOperations**.cpp/.h
+ - **UnityVersionControlOperations**.cpp/.h
    - `classes FPlastic<Operation> : public ISourceControlOperation`
    - implements each source control operation with a dedicated Worker class: add, delete, move, checkout, checkin, revert etc, see eg:
-   - `bool FPlasticCheckOutWorker::Execute(FPlasticSourceControlCommand& InCommand)` using the following two classes:
-     - **IPlasticSourceControlWorker**.h
-       - `class IPlasticSourceControlWorker`
+   - `bool FPlasticCheckOutWorker::Execute(FUnityVersionControlCommand& InCommand)` using the following two classes:
+     - **IUnityVersionControlWorker**.h
+       - `class IUnityVersionControlWorker`
        - interface of one Worker to be implemented for each of the operations
-     - **PlasticSourceControlCommand**.cpp/.h
-       - `class FPlasticSourceControlCommand : public IQueuedWork`
+     - **UnityVersionControlCommand**.cpp/.h
+       - `class FUnityVersionControlCommand : public IQueuedWork`
        - describes the parameters of the work to be executed for one operation
- - **PlasticSourceControlState**.cpp/.h
-   - `class FPlasticSourceControlState : public ISourceControlState`
+ - **UnityVersionControlState**.cpp/.h
+   - `class FUnityVersionControlState : public ISourceControlState`
    - implements information about the state of a file
- - **PlasticSourceControlRevision**.cpp/.h
-   - `class FPlasticSourceControlRevision : public ISourceControlRevision`
+ - **UnityVersionControlRevision**.cpp/.h
+   - `class FUnityVersionControlRevision : public ISourceControlRevision`
    - implements information about a revision in the history of a file
- - **PlasticSourceControlChangelist**.cpp/.h
-   - `class FPlasticSourceControlChangelist : public ISourceControlChangelist`
+ - **UnityVersionControlChangelist**.cpp/.h
+   - `class FUnityVersionControlChangelist : public ISourceControlChangelist`
    - Unique Identifier of a changelist under source control: a "name" in Unity Version Control
- - **PlasticSourceControlChangelistState**.cpp/.h
-   - `class FPlasticSourceControlChangelistState : public ISourceControlChangelistState`
+ - **UnityVersionControlChangelistState**.cpp/.h
+   - `class FUnityVersionControlChangelistState : public ISourceControlChangelistState`
    - The state of a pending changelist under source control: description and list of files
 
 ### Other most relevant structural files
 
- - **PlasticSourceControlModule**.cpp/.h
-   - `class FPlasticSourceControlModule : public IModuleInterface`
+ - **UnityVersionControlModule**.cpp/.h
+   - `class FUnityVersionControlModule : public IModuleInterface`
    - Singleton-like entry point of the plugin
- - **PlasticSourceControlUtils**.cpp/.h
-   - `namespace PlasticSourceControlUtils` with free functions
+ - **UnityVersionControlUtils**.cpp/.h
+   - `namespace UnityVersionControlUtils` with free functions
    - functions wrapping "cm" operations, and their the dedicated parsers (eg "status", "history" etc.)
- - **PlasticSourceControlShell**.cpp/.h
-   - `namespace PlasticSourceControlShell` with free functions and internal static variables
+ - **UnityVersionControlShell**.cpp/.h
+   - `namespace UnityVersionControlShell` with free functions and internal static variables
    - low level wrapper around the "cm shell" background process
- - **SPlasticSourceControlSettings**.cpp/.h
-   - `class SPlasticSourceControlSettings : public SCompoundWidget`
+ - **SUnityVersionControlSettings**.cpp/.h
+   - `class SUnityVersionControlSettings : public SCompoundWidget`
    - the "Source Control Login" window shown above: to enable the plugin, and with a wizard to create the workspace
- - **PlasticSourceControlSettings**.cpp/.h
+ - **UnityVersionControlSettings**.cpp/.h
    - serialize the 4 settings displayed in the Source Control Login in `Saved\Config\WindowsEditor\SourceControlSettings.ini`
 
 ### All the others providing various features
 
- - **PlasticSourceControlMenu**.cpp/.h
+ - **UnityVersionControlMenu**.cpp/.h
    - extends the main source control menu, now in the status bar at the bottom of the Editor
- - **PlasticSourceControlProjectSettings**.h
+ - **UnityVersionControlProjectSettings**.h
    - add a section "Editor - Source Control - Unity Version Control" to the Project Settings (saved in `Config\DefaultEditor.ini`)
- - **PlasticSourceControlConsole**.cpp/.h
+ - **UnityVersionControlConsole**.cpp/.h
    - add a console command that can be executed from the Editor status bar or Output Log to execute "cm" commands in order to query Unity Version Control, eg:
    - `cm location`
    - `cm find revision "where item='Content/ThirdPerson/Blueprints/BP_ThirdPersonCharacter.uasset'"`
@@ -673,9 +673,8 @@ All the relevant C++ source code of the plugin reside in one subdirectory `<Proj
    - Helper for temporary files to pass as arguments to some commands (typically for checkin multi-line text message)
  - **SoftwareVersion**.cpp/.h
    - Software version string in the form "X.Y.Z.C", ie Major.Minor.Patch.Changeset (as returned by GetPlasticScmVersion)
- - **PlasticSourceControlUtilsTests**.cpp
+ - **UnityVersionControlUtilsTests**.cpp
 
 ## Copyright
 
-Copyright Unity Technologies
-Developed by Sébastien Rombauts (sebastien.rombauts@gmail.com)
+Copyright (c) 2023 Unity Technologies

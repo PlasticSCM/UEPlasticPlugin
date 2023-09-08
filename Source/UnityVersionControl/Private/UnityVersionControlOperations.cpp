@@ -2127,7 +2127,6 @@ bool FPlasticDeleteShelveWorker::Execute(FUnityVersionControlCommand& InCommand)
 				}
 				else
 				{
-
 					FPaths::MakePathRelativeTo(File, *FPaths::ProjectDir());
 					UE_LOG(LogSourceControl, Error, TEXT("The file /%s is not in the changelist anymore, so the shelve cannot be updated. Unshelve the corresponding change and retry."), *File);
 					InCommand.bCommandSuccessful = false;
@@ -2202,7 +2201,7 @@ namespace ReviewHelpers
 	const FString ChangelistStatusKey = TEXT("status");
 	const FString ChangelistPendingStatusKey = TEXT("pending");
 	constexpr int32 RecordIndex = 0;
-}
+} // namespace ReviewHelpers
 
 #if ENGINE_MINOR_VERSION >= 1
 

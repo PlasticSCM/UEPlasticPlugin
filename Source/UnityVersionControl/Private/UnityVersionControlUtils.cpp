@@ -322,7 +322,6 @@ static EWorkspaceState StateFromStatus(const FString& InFileStatus, const bool b
 		{
 			State = EWorkspaceState::CheckedOutChanged; // Older version; need to assume it is changed to retain behavior
 		}
-
 	}
 	else if (InFileStatus == "CO+CH") // Checked-Out and changed from the new --iscochanged
 	{

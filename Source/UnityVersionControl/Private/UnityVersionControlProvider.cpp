@@ -517,8 +517,9 @@ bool FUnityVersionControlProvider::UsesCheckout() const
 
 bool FUnityVersionControlProvider::UsesFileRevisions() const
 {
-	// This API introduced in UE5.1 is broken (preventing the user to use the source control context menu for checkin,
-	// as well as selecting what files to submit in the global Submit Content window)
+	// This API introduced in UE5.1 is still broken as of UE5.3
+	// (preventing the user to use the source control context menu for checkin if returning false)
+	//	return IsPartialWorkspace();
 	return true;
 }
 

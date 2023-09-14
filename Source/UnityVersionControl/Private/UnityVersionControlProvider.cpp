@@ -31,7 +31,7 @@
 
 #define LOCTEXT_NAMESPACE "UnityVersionControl"
 
-static FName ProviderName("Unity Version Control");
+static FName ProviderName("UnityVersionControl");
 
 FUnityVersionControlProvider::FUnityVersionControlProvider()
 {

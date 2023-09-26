@@ -185,7 +185,7 @@ bool FPlasticConnectWorker::Execute(FUnityVersionControlCommand& InCommand)
 	}
 	else
 	{
-		const FText ErrorText(LOCTEXT("PlasticScmCliUnavaillable", "Failed to launch Unity Version Control (formerly Plastic SCM) 'cm' command line tool. You need to install it and make sure that 'cm' is on the Path and correctly configured."));
+		const FText ErrorText(LOCTEXT("PlasticScmCliUnavaillable", "Failed to launch Unity Version Control (formerly Plastic SCM) 'cm' command line tool. You need to install it and make sure it is correctly configured with your credentials."));
 		Operation->SetErrorText(ErrorText);
 		InCommand.ErrorMessages.Add(ErrorText.ToString());
 	}
@@ -925,7 +925,7 @@ FName FPlasticSwitchToPartialWorkspaceWorker::GetName() const
 
 bool FPlasticSwitchToPartialWorkspaceWorker::Execute(FUnityVersionControlCommand& InCommand)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticMakeWorkspaceWorker::Execute);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticSwitchToPartialWorkspaceWorker::Execute);
 
 	check(InCommand.Operation->GetName() == GetName());
 
@@ -1207,7 +1207,7 @@ bool FPlasticCopyWorker::Execute(FUnityVersionControlCommand& InCommand)
 
 bool FPlasticCopyWorker::UpdateStates()
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticCopyWorkers::UpdateStates);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticCopyWorker::UpdateStates);
 
 	return UnityVersionControlUtils::UpdateCachedStates(MoveTemp(States));
 }
@@ -1347,7 +1347,7 @@ bool FPlasticGetPendingChangelistsWorker::UpdateStates()
 	const FDateTime Now = FDateTime::Now();
 
 	// first update cached state from 'changes' call
-	for (int StatusIndex = 0; StatusIndex < OutChangelistsStates.Num(); StatusIndex++)
+	for (int32 StatusIndex = 0; StatusIndex < OutChangelistsStates.Num(); StatusIndex++)
 	{
 		const FUnityVersionControlChangelistState& CLStatus = OutChangelistsStates[StatusIndex];
 		TSharedRef<FUnityVersionControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(CLStatus.Changelist);
@@ -1550,6 +1550,8 @@ bool FPlasticNewChangelistWorker::Execute(class FUnityVersionControlCommand& InC
 
 bool FPlasticNewChangelistWorker::UpdateStates()
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticNewChangelistWorker::UpdateStates);
+
 	if (NewChangelist.IsInitialized())
 	{
 		const FDateTime Now = FDateTime::Now();
@@ -2286,7 +2288,7 @@ FName FPlasticGetFileWorker::GetName() const
 
 bool FPlasticGetFileWorker::Execute(FUnityVersionControlCommand& InCommand)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetChangelistDetailsWorker::FPlasticGetFileWorker);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetFileWorker::Execute);
 
 	TSharedRef<FGetFile, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FGetFile>(InCommand.Operation);
 
@@ -2305,9 +2307,7 @@ bool FPlasticGetFileWorker::Execute(FUnityVersionControlCommand& InCommand)
 	}
 
 	FString OutFilename;
-
 	InCommand.bCommandSuccessful = SourceControlRevision->Get(OutFilename, InCommand.Concurrency);
-
 	if (InCommand.bCommandSuccessful)
 	{
 		Operation->SetOutPackageFilename(OutFilename);

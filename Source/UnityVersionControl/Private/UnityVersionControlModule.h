@@ -33,11 +33,19 @@ public:
 	 * Singleton-like access to this module's interface.  This is just for convenience!
 	 * Beware of calling this during the shutdown phase, though.  Your module might have been unloaded already.
 	 *
-	 * @return Returns singleton instance, loading the module on demand if needed
+	 * @return Returns singleton instance, asserts if the module is not loaded yet or unloaded already.
 	 */
 	static inline FUnityVersionControlModule& Get()
 	{
 		return FModuleManager::GetModuleChecked<FUnityVersionControlModule>("UnityVersionControl");
+	}
+
+	/**
+	 * Checks whether the module is currently loaded.
+	 */
+	static inline bool IsLoaded()
+	{
+		return FModuleManager::Get().IsModuleLoaded("UnityVersionControl");
 	}
 
 private:

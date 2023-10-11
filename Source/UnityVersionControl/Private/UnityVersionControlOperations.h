@@ -98,6 +98,22 @@ public:
 };
 
 
+/**
+ * Internal operation used to release or remove Lock(s) on file(s)
+*/
+class FPlasticUnlock final : public ISourceControlOperation
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	// Release the Lock(s), and optionally remove (delete) them completely
+	bool bRemove = false;
+};
+
+
 /** Called when first activated on a project, and then at project load time.
  *  Look for the root directory of the Plastic workspace (where the ".plastic/" subdirectory is located). */
 class FPlasticConnectWorker final : public IUnityVersionControlWorker
@@ -293,6 +309,24 @@ public:
 		: IUnityVersionControlWorker(InSourceControlProvider)
 	{}
 	virtual ~FPlasticSwitchToPartialWorkspaceWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+
+public:
+	/** Temporary states for results */
+	TArray<FUnityVersionControlState> States;
+};
+
+/** release or remove Lock(s) on file(s). */
+class FPlasticUnlockWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticUnlockWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticUnlockWorker() = default;
 	// IUnityVersionControlWorker interface
 	virtual FName GetName() const override;
 	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;

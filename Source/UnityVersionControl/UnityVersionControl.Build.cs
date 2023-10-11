@@ -24,12 +24,9 @@ public class UnityVersionControl : ModuleRules
 				"Projects",
 				"AssetRegistry",
 				"DeveloperSettings",
+				"ToolMenus",
+				"ContentBrowser",
 			}
 		);
-
-		if (Target.Version.MajorVersion == 5)
-		{
-			PrivateDependencyModuleNames.Add("ToolMenus");
-		}
 	}
 }

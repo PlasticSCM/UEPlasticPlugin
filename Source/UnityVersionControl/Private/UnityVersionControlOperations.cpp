@@ -43,6 +43,7 @@ void IUnityVersionControlWorker::RegisterWorkers(FUnityVersionControlProvider& U
 	UnityVersionControlProvider.RegisterWorker("RevertUnchanged", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticRevertUnchangedWorker>));
 	UnityVersionControlProvider.RegisterWorker("RevertAll", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticRevertAllWorker>));
 	UnityVersionControlProvider.RegisterWorker("SwitchToPartialWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToPartialWorkspaceWorker>));
+	UnityVersionControlProvider.RegisterWorker("Unlock", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnlockWorker>));
 	UnityVersionControlProvider.RegisterWorker("MakeWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticMakeWorkspaceWorker>));
 	UnityVersionControlProvider.RegisterWorker("Sync", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
 	UnityVersionControlProvider.RegisterWorker("SyncAll", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
@@ -116,6 +117,20 @@ FText FPlasticSwitchToPartialWorkspace::GetInProgressString() const
 {
 	return LOCTEXT("SourceControl_SwitchToPartialWorkspace", "Switching to a Partial/Gluon Workspace");
 }
+
+FName FPlasticUnlock::GetName() const
+{
+	return "Unlock";
+}
+
+FText FPlasticUnlock::GetInProgressString() const
+{
+	if (bRemove)
+		return LOCTEXT("SourceControl_Unlock_Remove", "Removing Lock(s)");
+	else
+		return LOCTEXT("SourceControl_Unlock_Release", "Releasing Lock(s)");
+}
+
 
 static bool AreAllFiles(const TArray<FString>& InFiles)
 {
@@ -946,6 +961,50 @@ bool FPlasticSwitchToPartialWorkspaceWorker::Execute(FUnityVersionControlCommand
 }
 
 bool FPlasticSwitchToPartialWorkspaceWorker::UpdateStates()
+{
+	return UnityVersionControlUtils::UpdateCachedStates(MoveTemp(States));
+}
+
+FName FPlasticUnlockWorker::GetName() const
+{
+	return "Unlock";
+}
+
+bool FPlasticUnlockWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticUnlockWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticUnlock, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticUnlock>(InCommand.Operation);
+
+	{
+		// retrieve the itemid of assets to unlock
+		FString ItemIds;
+		for (const FString& File : InCommand.Files)
+		{
+			const auto State = GetProvider().GetStateInternal(File);
+			if (State->LockedId != ISourceControlState::INVALID_REVISION)
+			{
+				ItemIds += FString::Printf(TEXT("itemid:%d "), State->LockedId);
+			}
+		}
+
+		TArray<FString> Parameters;
+		Parameters.Add(TEXT("unlock"));
+		if (Operation->bRemove)
+			Parameters.Add(TEXT("--remove"));
+		Parameters.Add(ItemIds);
+		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("lock"), Parameters, TArray<FString>(), InCommand.InfoMessages, InCommand.ErrorMessages);
+	}
+
+	{
+		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunUpdateStatus(InCommand.Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
+	}
+
+	return InCommand.bCommandSuccessful;
+}
+
+bool FPlasticUnlockWorker::UpdateStates()
 {
 	return UnityVersionControlUtils::UpdateCachedStates(MoveTemp(States));
 }

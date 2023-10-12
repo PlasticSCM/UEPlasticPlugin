@@ -13,7 +13,6 @@
 	"EngineVersion": "5.0.0",
 	"EnabledByDefault": true,
 	"CanContainContent": false,
-	"IsBetaVersion": false,
 	"Installed": true,
 	"Modules": [
 		{

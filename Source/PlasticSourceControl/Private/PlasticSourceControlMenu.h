@@ -37,18 +37,26 @@ private:
 	TArray<FString>		ListAllPackages();
 
 #if ENGINE_MAJOR_VERSION == 4
+	// TODO UE4.27
 	void AddMenuExtension(FMenuBuilder& Menu);
 
 	TSharedRef<class FExtender> OnExtendLevelEditorViewMenu(const TSharedRef<class FUICommandList> CommandList);
 #elif ENGINE_MAJOR_VERSION == 5
-	void AddMenuExtension(FToolMenuSection& Menu);
+	void AddMenuActions(FToolMenuSection& Menu);
 #endif
+
+	// TODO POC
+	/** Called to generate sub menus. */
+	void GeneratePlasticSettingsMenu(FMenuBuilder& MenuBuilder);
+	void GeneratePlasticWebLinksMenu(FMenuBuilder& MenuBuilder);
+
 
 	// TODO REVIEW POC to be renamed and reworked as needed
 
 	/** Extends the toolbar with MU source control options */
 	void ExtendToolbarWithSourceControlMenu();
 	TSharedRef<SWidget> CreateStatusBarWidget();
+
 
 	/** Extends the main Revision Control menu from the toolbar at the bottom-right. */
 	void ExtendRevisionControlMenu();

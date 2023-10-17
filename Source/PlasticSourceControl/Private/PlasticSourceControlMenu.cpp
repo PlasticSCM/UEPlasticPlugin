@@ -97,16 +97,51 @@ void FPlasticSourceControlMenu::ExtendRevisionControlMenu()
 	{
 		if (UToolMenu* SourceControlMenu = ToolMenus->ExtendMenu("StatusBar.ToolBar.SourceControl"))
 		{
-			FToolMenuSection& Section = SourceControlMenu->AddSection("PlasticSourceControlActions", LOCTEXT("PlasticSourceControlMenuHeadingActions", "Unity Version Control"), FToolMenuInsert(NAME_None, EToolMenuInsertType::First));
+			// Merge the main actions into the existing source control actions, at the top of the menu
+			FToolMenuSection& ActionsSection = SourceControlMenu->FindOrAddSection("SourceControlActions");
+			AddMenuActions(ActionsSection);
 
-			AddMenuExtension(Section);
+			// Create a dedicated section for Unity Version Control submenus
+			FToolMenuSection& UnityVersionControlSection = SourceControlMenu->AddSection("UnityVersionControlSection", LOCTEXT("UnityVersionControlMenuHeading", "Unity Version Control"));
+			UnityVersionControlSection.AddSubMenu(
+				TEXT("PlasticSettingsSubMenu"),
+				LOCTEXT("PlasticSettingsSubMenu", "Settings"),
+				FText::GetEmpty(),
+				FNewMenuDelegate::CreateRaw(this, &FPlasticSourceControlMenu::GeneratePlasticSettingsMenu),
+				false,
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "ProjectSettings.TabIcon")
+#else
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "ProjectSettings.TabIcon")
+#endif
+			);
+			UnityVersionControlSection.AddSubMenu(
+				TEXT("PlasticWebLinksSubMenu"),
+				LOCTEXT("PlasticWebLinksSubMenu", "Web Links"),
+				FText::GetEmpty(),
+				FNewMenuDelegate::CreateRaw(this, &FPlasticSourceControlMenu::GeneratePlasticWebLinksMenu),
+				false,
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Documentation")
+#elif ENGINE_MAJOR_VERSION == 5
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "Icons.Documentation")
+#elif ENGINE_MAJOR_VERSION == 4
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.BrowseDocumentation")
+#endif
+			);
+
+			// TODO add "Recent branches" as a submenu?
+			// can we fit a full submenu on each of these branches? Is it even a good UI/UX practice (I doubt it)
+			//   - switch to?
+			//   - delete?
+			//   - rename?
+			// TODO add "Create branch"
 
 
 			// TODO: try to also extend "SourceControlSubMenu", to add another section below "AssetSourceControlActions"
 			// Note: inspired by FConcertWorkspaceUI::ExtendAssetContextMenuOptions()
 			ExtendToolbarWithSourceControlMenu();
 
-			
 			bHasRegistered = true;
 		}
 	}
@@ -138,7 +173,6 @@ TSharedRef<SWidget> FPlasticSourceControlMenu::CreateStatusBarWidget()
 	return SNew(SUnsavedAssetsStatusBarWidget);
 }
 
-
 void FPlasticSourceControlMenu::ExtendAssetContextMenu()
 {
 	const FToolMenuOwnerScoped SourceControlMenuOwner(UnityVersionControlAssetContextLocksMenuOwnerName);
@@ -163,6 +197,7 @@ void FPlasticSourceControlMenu::ExtendAssetContextMenu()
 			AssetObjectPaths.Reserve(Context->SelectedObjects.Num());
 			for (const auto SelectedObject : SelectedObjects)
 			{
+			// TODO: remove this transformation since we want to use the AssetData directly!
 				AssetObjectPaths.Add(FAssetData(SelectedObject));
 			}
 #else
@@ -691,9 +726,9 @@ void FPlasticSourceControlMenu::OnSourceControlOperationComplete(const FSourceCo
 }
 
 #if ENGINE_MAJOR_VERSION == 4
-void FPlasticSourceControlMenu::AddMenuExtension(FMenuBuilder& Menu)
+void FPlasticSourceControlMenu::AddMenuActions(FMenuBuilder& Menu)
 #elif ENGINE_MAJOR_VERSION == 5
-void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
+void FPlasticSourceControlMenu::AddMenuActions(FToolMenuSection& Menu)
 #endif
 {
 	Menu.AddMenuEntry(
@@ -785,121 +820,124 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 			FCanExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::CanSwitchToPartialWorkspace)
 		)
 	);
+}
 
-	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
-		"SourceControlEditorPreferences",
-#endif
-		LOCTEXT("SourceControlEditorPreferences", "Editor Preferences - Source Control"),
-		LOCTEXT("SourceControlEditorPreferencesTooltip", "Open the Load & Save section with Source Control in the Editor Preferences."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "EditorPreferences.TabIcon"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "EditorPreferences.TabIcon"),
-#endif
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlEditorPreferences),
-			FCanExecuteAction()
-		)
-	);
 
-#if ENGINE_MAJOR_VERSION == 5 // Disable the "Source Control Project Settings" for UE4 since this section is new to UE5
-	Menu.AddMenuEntry(
-		"SourceControlProjectSettings",
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
-		LOCTEXT("SourceControlProjectSettings",			"Project Settings - Revision Control"),
-		LOCTEXT("SourceControlProjectSettingsTooltip",	"Open the Revision Control section in the Project Settings."),
-#else
-		LOCTEXT("SourceControlProjectSettings",			"Project Settings - Source Control"),
-		LOCTEXT("SourceControlProjectSettingsTooltip",	"Open the Source Control section in the Project Settings."),
-#endif
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "ProjectSettings.TabIcon"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "ProjectSettings.TabIcon"),
-#endif
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlProjectSettings),
-			FCanExecuteAction()
-		)
-	);
-#endif
+void FPlasticSourceControlMenu::GeneratePlasticSettingsMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.BeginSection("PlasticSettings", LOCTEXT("PlasticSettingsSubMenuHeading", "Unity Version Control Settings"));
 
-	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
-		"PlasticProjectSettings",
-#endif
-		LOCTEXT("PlasticProjectSettings",			"Project Settings - Source Control - Unity Version Control"),
-		LOCTEXT("PlasticProjectSettingsTooltip",	"Open the Unity Version Control (formerly Plastic SCM) section in the Project Settings."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "ProjectSettings.TabIcon"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "ProjectSettings.TabIcon"),
-#endif
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlPlasticScmProjectSettings),
-			FCanExecuteAction()
-		)
-	);
-
-	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
-		"PlasticDocsURL",
-#endif
-		LOCTEXT("PlasticDocsURL",			"Plugin's Documentation"),
-		LOCTEXT("PlasticDocsURLTooltip",	"Visit documentation of the plugin on Github."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Documentation"),
-#elif ENGINE_MAJOR_VERSION == 5
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "Icons.Documentation"),
-#elif ENGINE_MAJOR_VERSION == 4
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.BrowseDocumentation"),
-#endif
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitDocsURLClicked),
-			FCanExecuteAction()
-		)
-	);
-
-	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
-		"PlasticSupportURL",
-#endif
-		LOCTEXT("PlasticSupportURL",		"Unity Version Control Support"),
-		LOCTEXT("PlasticSupportURLTooltip",	"Submit a support request for Unity Version Control (formerly Plastic SCM)."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Support"),
-#elif ENGINE_MAJOR_VERSION == 5
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "Icons.Support"),
-#elif ENGINE_MAJOR_VERSION == 4
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.BrowseDocumentation"),
-#endif
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitSupportURLClicked),
-			FCanExecuteAction()
-		)
-	);
-
-	FString OrganizationName = FPlasticSourceControlModule::Get().GetProvider().GetCloudOrganization();
-	if (!OrganizationName.IsEmpty())
 	{
-		Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
-			"PlasticLockRulesURL",
-#endif
-			LOCTEXT("PlasticLockRulesURL", "Configure Lock Rules"),
-			LOCTEXT("PlasticLockRulesURLTooltip", "Navigate to lock rules configuration page in the Unity Dashboard."),
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("SourceControlEditorPreferences", "Editor Preferences - Source Control"),
+			LOCTEXT("SourceControlEditorPreferencesTooltip", "Open the Load & Save section with Source Control in the Editor Preferences."),
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-			FSlateIcon(FAppStyle::GetAppStyleSetName(), "PropertyWindow.Locked"),
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "EditorPreferences.TabIcon"),
 #else
-			FSlateIcon(FEditorStyle::GetStyleSetName(), "PropertyWindow.Locked"),
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "EditorPreferences.TabIcon"),
 #endif
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitLockRulesURLClicked, MoveTemp(OrganizationName)),
+				FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlEditorPreferences),
+				FCanExecuteAction()
+			)
+		);
+
+#if ENGINE_MAJOR_VERSION == 5 // Disable the "Source Control Project Settings" for UE4 since this section is new to UE5
+		MenuBuilder.AddMenuEntry(
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
+			LOCTEXT("SourceControlProjectSettings", "Project Settings - Editor - Revision Control"),
+			LOCTEXT("SourceControlProjectSettingsTooltip", "Open the Revision Control section in the Project Settings."),
+#else
+			LOCTEXT("SourceControlProjectSettings", "Project Settings - Editor - Source Control"),
+			LOCTEXT("SourceControlProjectSettingsTooltip", "Open the Source Control section in the Project Settings."),
+#endif
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ProjectSettings.TabIcon"),
+#else
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "ProjectSettings.TabIcon"),
+#endif
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlProjectSettings),
+				FCanExecuteAction()
+			)
+		);
+#endif
+
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("PlasticProjectSettings", "Project Settings - Editor - Source Control - Unity Version Control"),
+			LOCTEXT("PlasticProjectSettingsTooltip", "Open the Unity Version Control (formerly Plastic SCM) section in the Project Settings."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "ProjectSettings.TabIcon"),
+#else
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "ProjectSettings.TabIcon"),
+#endif
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ShowSourceControlPlasticScmProjectSettings),
 				FCanExecuteAction()
 			)
 		);
 	}
+
+	MenuBuilder.EndSection();
+}
+
+void FPlasticSourceControlMenu::GeneratePlasticWebLinksMenu(FMenuBuilder& MenuBuilder)
+{
+	MenuBuilder.BeginSection("PlasticSettings", LOCTEXT("PlasticSettingsSubMenuHeading", "Unity Version Control Settings"));
+
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("PlasticDocsURL", "Plugin's Documentation"),
+			LOCTEXT("PlasticDocsURLTooltip", "Visit documentation of the plugin on Github."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Documentation"),
+#elif ENGINE_MAJOR_VERSION == 5
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Icons.Documentation"),
+#elif ENGINE_MAJOR_VERSION == 4
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.BrowseDocumentation"),
+#endif
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitDocsURLClicked),
+				FCanExecuteAction()
+			)
+		);
+
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("PlasticSupportURL", "Unity Version Control Support"),
+			LOCTEXT("PlasticSupportURLTooltip", "Submit a support request for Unity Version Control (formerly Plastic SCM)."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Support"),
+#elif ENGINE_MAJOR_VERSION == 5
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "Icons.Support"),
+#elif ENGINE_MAJOR_VERSION == 4
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.BrowseDocumentation"),
+#endif
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitSupportURLClicked),
+				FCanExecuteAction()
+			)
+		);
+
+		FString OrganizationName = FPlasticSourceControlModule::Get().GetProvider().GetCloudOrganization();
+		if (!OrganizationName.IsEmpty())
+		{
+			MenuBuilder.AddMenuEntry(
+				LOCTEXT("PlasticLockRulesURL", "Configure Lock Rules"),
+				LOCTEXT("PlasticLockRulesURLTooltip", "Navigate to lock rules configuration page in the Unity Dashboard."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "PropertyWindow.Locked"),
+#else
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "PropertyWindow.Locked"),
+#endif
+				FUIAction(
+					FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitLockRulesURLClicked, MoveTemp(OrganizationName)),
+					FCanExecuteAction()
+				)
+			);
+		}
+	}
+
+	MenuBuilder.EndSection();
 }
 
 #if ENGINE_MAJOR_VERSION == 4

@@ -44,6 +44,12 @@ private:
 	void AddMenuExtension(FToolMenuSection& Menu);
 #endif
 
+	// TODO REVIEW POC to be renamed and reworked as needed
+
+	/** Extends the toolbar with MU source control options */
+	void ExtendToolbarWithSourceControlMenu();
+	TSharedRef<SWidget> CreateStatusBarWidget();
+
 	/** Extends the main Revision Control menu from the toolbar at the bottom-right. */
 	void ExtendRevisionControlMenu();
 	/** Extends the content browser asset context menu with Admin revision control options. */
@@ -84,3 +90,31 @@ private:
 	/** Generic delegate and notification handler */
 	void OnSourceControlOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult);
 };
+
+
+// TODO move this to a separate file, with a different name etc!
+
+/**
+ * Tracks assets that has in-memory modification not saved to disk yet and checks
+ * the source control states of those assets when a source control provider is available.
+ */
+class SUnsavedAssetsStatusBarWidget : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SUnsavedAssetsStatusBarWidget)
+	{}
+	/** Event fired when the status bar button is clicked */
+	SLATE_EVENT(FOnClicked, OnClicked)
+		SLATE_END_ARGS()
+
+		/** Constructs the widget */
+		void Construct(const FArguments& InArgs);
+
+private:
+	const FSlateBrush* GetStatusBarIcon() const;
+	FText GetStatusBarText() const;
+	FText GetStatusBarTooltip() const;
+
+private:
+};
+

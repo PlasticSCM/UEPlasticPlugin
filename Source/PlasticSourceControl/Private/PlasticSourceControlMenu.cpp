@@ -101,11 +101,43 @@ void FPlasticSourceControlMenu::ExtendRevisionControlMenu()
 
 			AddMenuExtension(Section);
 
+
+			// TODO: try to also extend "SourceControlSubMenu", to add another section below "AssetSourceControlActions"
+			// Note: inspired by FConcertWorkspaceUI::ExtendAssetContextMenuOptions()
+			ExtendToolbarWithSourceControlMenu();
+
+			
 			bHasRegistered = true;
 		}
 	}
 #endif
 }
+
+
+void FPlasticSourceControlMenu::ExtendToolbarWithSourceControlMenu()
+{
+	// TODO	const FToolMenuOwnerScoped SourceControlMenuOwner(PlasticBranchToolbarOwnerName);
+
+	/// Inspired by SLevelEditor::RegisterStatusBarTools()
+	/// => see also SUnsavedAssetsStatusBarWidget
+
+	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.StatusBar.ToolBar");
+	FToolMenuSection& Section = ToolbarMenu->AddSection("Unity Version Control", FText::GetEmpty(), FToolMenuInsert("SourceControl", EToolMenuInsertType::Before));
+
+	Section.AddEntry(
+		FToolMenuEntry::InitWidget("DerivedDatatatusBar", CreateStatusBarWidget(), FText::GetEmpty(), true, false)
+	);
+}
+
+
+// TODO move that to a separate file
+// See SUnsavedAssetsStatusBarWidget
+
+TSharedRef<SWidget> FPlasticSourceControlMenu::CreateStatusBarWidget()
+{
+	return SNew(SUnsavedAssetsStatusBarWidget);
+}
+
 
 void FPlasticSourceControlMenu::ExtendAssetContextMenu()
 {
@@ -884,5 +916,55 @@ TSharedRef<FExtender> FPlasticSourceControlMenu::OnExtendLevelEditorViewMenu(con
 	return Extender;
 }
 #endif
+
+
+
+void SUnsavedAssetsStatusBarWidget::Construct(const FArguments& InArgs)
+{
+	ChildSlot
+	[
+		SNew(SButton)
+		.ContentPadding(FMargin(6.0f, 0.0f))
+		.ToolTipText_Lambda([this]() { return GetStatusBarTooltip(); })
+		.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+		.OnClicked(InArgs._OnClicked)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			.HAlign(HAlign_Center)
+			[
+				SNew(SImage)
+				.Image_Lambda([this](){ return GetStatusBarIcon(); })
+			]
+			+ SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			.Padding(FMargin(5, 0, 0, 0))
+			[
+				SNew(STextBlock)
+				.TextStyle(&FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
+				.Text_Lambda([this]() { return GetStatusBarText(); })
+			]
+		]
+	];
+}
+
+const FSlateBrush* SUnsavedAssetsStatusBarWidget::GetStatusBarIcon() const
+{
+	// TODO plastic log? branch logo?
+	return FAppStyle::GetBrush("SourceControl.Branch");
+}
+
+FText SUnsavedAssetsStatusBarWidget::GetStatusBarText() const
+{;
+	return FText::FromString(FPlasticSourceControlModule::Get().GetProvider().GetBranchName());
+}
+
+FText SUnsavedAssetsStatusBarWidget::GetStatusBarTooltip() const
+{
+	return LOCTEXT("Branches_Tooltip", "Switch to another branch.");
+}
 
 #undef LOCTEXT_NAMESPACE

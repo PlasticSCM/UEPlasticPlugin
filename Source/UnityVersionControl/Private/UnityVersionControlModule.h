@@ -6,6 +6,7 @@
 #include "Modules/ModuleInterface.h"
 #include "Modules/ModuleManager.h"
 #include "UnityVersionControlProvider.h"
+#include "UnityVersionControlWorkspaceCreation.h"
 
 /**
  * UnityVersionControl is the official Unity Version Control Plugin for Unreal Engine
@@ -27,6 +28,12 @@ public:
 	const FUnityVersionControlProvider& GetProvider() const
 	{
 		return UnityVersionControlProvider;
+	}
+
+	/** Access the controller to create a new workspace */
+	FUnityVersionControlWorkspaceCreation& GetWorkspaceCreation()
+	{
+		return UnityVersionControlWorkspaceCreation;
 	}
 
 	/**
@@ -51,4 +58,7 @@ public:
 private:
 	/** The Plastic source control provider */
 	FUnityVersionControlProvider UnityVersionControlProvider;
+
+	/** Logic to create a new workspace */
+	FUnityVersionControlWorkspaceCreation UnityVersionControlWorkspaceCreation;
 };

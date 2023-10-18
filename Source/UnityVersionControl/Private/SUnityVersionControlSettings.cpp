@@ -12,7 +12,6 @@
 #include "Misc/App.h"
 #include "Misc/FileHelper.h"
 #include "Modules/ModuleManager.h"
-#include "Framework/Notifications/NotificationManager.h"
 #include "Styling/SlateTypes.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
@@ -20,7 +19,6 @@
 #include "Widgets/Input/SCheckBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SSeparator.h"
-#include "Widgets/Notifications/SNotificationList.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Runtime/Launch/Resources/Version.h"
@@ -41,15 +39,15 @@ void SUnityVersionControlSettings::Construct(const FArguments& InArgs)
 #endif
 
 	bAutoCreateIgnoreFile = CanAutoCreateIgnoreFile();
-	bAutoInitialCommit = true;
+	WorkspaceParams.bAutoInitialCommit = true;
 
-	InitialCommitMessage = LOCTEXT("InitialCommitMessage", "Initial checkin");
-	ServerUrl = FText::FromString(FUnityVersionControlModule::Get().GetProvider().GetServerUrl());
-	
+	WorkspaceParams.InitialCommitMessage = LOCTEXT("InitialCommitMessage", "Initial checkin");
+	WorkspaceParams.ServerUrl = FText::FromString(FUnityVersionControlModule::Get().GetProvider().GetServerUrl());
+
 	if (FApp::HasProjectName())
 	{
-		WorkspaceName = FText::FromString(FApp::GetProjectName());
-		RepositoryName = WorkspaceName;
+		WorkspaceParams.WorkspaceName = FText::FromString(FApp::GetProjectName());
+		WorkspaceParams.RepositoryName = WorkspaceParams.WorkspaceName;
 	}
 
 	ChildSlot
@@ -260,7 +258,7 @@ void SUnityVersionControlSettings::Construct(const FArguments& InArgs)
 			SNew(SCheckBox)
 			.Visibility(this, &SUnityVersionControlSettings::CanCreatePlasticWorkspace)
 			.ToolTipText(LOCTEXT("CreatePartialWorkspace_Tooltip", "Create the new workspace in Gluon/partial mode, designed for artists."))
-			.IsChecked(bCreatePartialWorkspace)
+			.IsChecked(WorkspaceParams.bCreatePartialWorkspace)
 			.OnCheckStateChanged(this, &SUnityVersionControlSettings::OnCheckedCreatePartialWorkspace)
 			[
 				SNew(STextBlock)
@@ -468,50 +466,50 @@ EVisibility SUnityVersionControlSettings::CanCreatePlasticWorkspace() const
 bool SUnityVersionControlSettings::IsReadyToCreatePlasticWorkspace() const
 {
 	// Workspace Name cannot be left empty
-	const bool bWorkspaceNameOk = !WorkspaceName.IsEmpty();
+	const bool bWorkspaceNameOk = !WorkspaceParams.WorkspaceName.IsEmpty();
 	// RepositoryName and ServerUrl should also be filled
-	const bool bRepositoryNameOk = !RepositoryName.IsEmpty() && !ServerUrl.IsEmpty();
+	const bool bRepositoryNameOk = !WorkspaceParams.RepositoryName.IsEmpty() && !WorkspaceParams.ServerUrl.IsEmpty();
 	// If Initial Commit is requested, checkin message cannot be empty
-	const bool bInitialCommitOk = (!bAutoInitialCommit || !InitialCommitMessage.IsEmpty());
+	const bool bInitialCommitOk = (!WorkspaceParams.bAutoInitialCommit || !WorkspaceParams.InitialCommitMessage.IsEmpty());
 	return bWorkspaceNameOk && bRepositoryNameOk && bInitialCommitOk;
 }
 
 
 void SUnityVersionControlSettings::OnWorkspaceNameCommited(const FText& InText, ETextCommit::Type InCommitType)
 {
-	WorkspaceName = InText;
+	WorkspaceParams.WorkspaceName = InText;
 }
 FText SUnityVersionControlSettings::GetWorkspaceName() const
 {
-	return WorkspaceName;
+	return WorkspaceParams.WorkspaceName;
 }
 
 void SUnityVersionControlSettings::OnRepositoryNameCommited(const FText& InText, ETextCommit::Type InCommitType)
 {
-	RepositoryName = InText;
+	WorkspaceParams.RepositoryName = InText;
 }
 FText SUnityVersionControlSettings::GetRepositoryName() const
 {
-	return RepositoryName;
+	return WorkspaceParams.RepositoryName;
 }
 
 void SUnityVersionControlSettings::OnServerUrlCommited(const FText& InText, ETextCommit::Type InCommitType)
 {
-	ServerUrl = InText;
+	WorkspaceParams.ServerUrl = InText;
 }
 FText SUnityVersionControlSettings::GetServerUrl() const
 {
-	return ServerUrl;
+	return WorkspaceParams.ServerUrl;
 }
 
 bool SUnityVersionControlSettings::CreatePartialWorkspace() const
 {
-	return bCreatePartialWorkspace;
+	return WorkspaceParams.bCreatePartialWorkspace;
 }
 
 void SUnityVersionControlSettings::OnCheckedCreatePartialWorkspace(ECheckBoxState NewCheckedState)
 {
-	bCreatePartialWorkspace = (NewCheckedState == ECheckBoxState::Checked);
+	WorkspaceParams.bCreatePartialWorkspace = (NewCheckedState == ECheckBoxState::Checked);
 }
 
 bool SUnityVersionControlSettings::CanAutoCreateIgnoreFile() const
@@ -527,183 +525,36 @@ void SUnityVersionControlSettings::OnCheckedCreateIgnoreFile(ECheckBoxState NewC
 
 void SUnityVersionControlSettings::OnCheckedInitialCommit(ECheckBoxState NewCheckedState)
 {
-	bAutoInitialCommit = (NewCheckedState == ECheckBoxState::Checked);
+	WorkspaceParams.bAutoInitialCommit = (NewCheckedState == ECheckBoxState::Checked);
 }
 
 void SUnityVersionControlSettings::OnInitialCommitMessageCommited(const FText& InText, ETextCommit::Type InCommitType)
 {
-	InitialCommitMessage = InText;
+	WorkspaceParams.InitialCommitMessage = InText;
 }
 
 FText SUnityVersionControlSettings::GetInitialCommitMessage() const
 {
-	return InitialCommitMessage;
+	return WorkspaceParams.InitialCommitMessage;
 }
 
 
 FReply SUnityVersionControlSettings::OnClickedCreatePlasticWorkspace()
 {
-	UE_LOG(LogSourceControl, Log, TEXT("CreatePlasticWorkspace(%s, %s, %s) CreateIgnore=%d Commit=%d"),
-		*WorkspaceName.ToString(), *RepositoryName.ToString(), *ServerUrl.ToString(), bAutoCreateIgnoreFile, bAutoInitialCommit);
+	UE_LOG(LogSourceControl, Log, TEXT("CreatePlasticWorkspace(%s, %s, %s) PartialWorkspace=%d CreateIgnore=%d Commit=%d"),
+		*WorkspaceParams.WorkspaceName.ToString(), *WorkspaceParams.RepositoryName.ToString(), *WorkspaceParams.ServerUrl.ToString(),
+		WorkspaceParams.bCreatePartialWorkspace, bAutoCreateIgnoreFile, WorkspaceParams.bAutoInitialCommit);
 
-	// 1.a. Create a repository (if not already existing) and a workspace: launch an asynchronous MakeWorkspace operation
-	LaunchMakeWorkspaceOperation();
+	if (bAutoCreateIgnoreFile)
+	{
+		// 1. Create a standard "ignore.conf" file with common patterns for a typical Blueprint & C++ project
+		CreateIgnoreFile();
+	}
+
+	// 2. Create a repository (if not already existing) and a workspace: launch an asynchronous MakeWorkspace operation
+	FUnityVersionControlModule::Get().GetWorkspaceCreation().MakeWorkspace(WorkspaceParams);
 
 	return FReply::Handled();
-}
-
-
-/// 1. Create a repository (if not already existing) and a workspace
-void SUnityVersionControlSettings::LaunchMakeWorkspaceOperation()
-{
-	TSharedRef<FPlasticMakeWorkspace, ESPMode::ThreadSafe> MakeWorkspaceOperation = ISourceControlOperation::Create<FPlasticMakeWorkspace>();
-	MakeWorkspaceOperation->WorkspaceName = WorkspaceName.ToString();
-	MakeWorkspaceOperation->RepositoryName = RepositoryName.ToString();
-	MakeWorkspaceOperation->ServerUrl = ServerUrl.ToString();
-	MakeWorkspaceOperation->bPartialWorkspace = bCreatePartialWorkspace;
-
-	FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-	ECommandResult::Type Result = Provider.Execute(MakeWorkspaceOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SUnityVersionControlSettings::OnSourceControlOperationComplete));
-	if (Result == ECommandResult::Succeeded)
-	{
-		DisplayInProgressNotification(MakeWorkspaceOperation->GetInProgressString());
-	}
-	else
-	{
-		DisplayFailureNotification(MakeWorkspaceOperation->GetName());
-	}
-}
-
-/// 2. Add all project files to Source Control (.uproject, Config/, Content/, Source/ files and ignore.conf if any)
-void SUnityVersionControlSettings::LaunchMarkForAddOperation()
-{
-	TSharedRef<FMarkForAdd, ESPMode::ThreadSafe> MarkForAddOperation = ISourceControlOperation::Create<FMarkForAdd>();
-	FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-
-	// 1.b. Check the new workspace status to enable connection
-	Provider.CheckPlasticAvailability();
-
-	if (Provider.IsWorkspaceFound())
-	{
-		if (bAutoCreateIgnoreFile)
-		{
-			// 1.c Create a standard "ignore.conf" file with common patterns for a typical Blueprint & C++ project
-			CreateIgnoreFile();
-		}
-		// 2. Add all project files to Source Control (.uproject, Config/, Content/, Source/ files and ignore.conf if any)
-		const TArray<FString> ProjectFiles = GetProjectFiles();
-		ECommandResult::Type Result = Provider.Execute(MarkForAddOperation, ProjectFiles, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SUnityVersionControlSettings::OnSourceControlOperationComplete));
-		if (Result == ECommandResult::Succeeded)
-		{
-			DisplayInProgressNotification(MarkForAddOperation->GetInProgressString());
-		}
-		else
-		{
-			DisplayFailureNotification(MarkForAddOperation->GetName());
-		}
-	}
-	else
-	{
-		DisplayFailureNotification(MarkForAddOperation->GetName());
-	}
-}
-
-/// 3. Launch an asynchronous "CheckIn" operation and start another ongoing notification
-void SUnityVersionControlSettings::LaunchCheckInOperation()
-{
-	TSharedRef<FCheckIn, ESPMode::ThreadSafe> CheckInOperation = ISourceControlOperation::Create<FCheckIn>();
-	CheckInOperation->SetDescription(InitialCommitMessage);
-	FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-	const TArray<FString> ProjectFiles = GetProjectFiles(); // Note: listing files and folders is only needed for the update status operation following the checkin to know on what to operate
-	ECommandResult::Type Result = Provider.Execute(CheckInOperation, ProjectFiles, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SUnityVersionControlSettings::OnSourceControlOperationComplete));
-	if (Result == ECommandResult::Succeeded)
-	{
-		DisplayInProgressNotification(CheckInOperation->GetInProgressString());
-	}
-	else
-	{
-		DisplayFailureNotification(CheckInOperation->GetName());
-	}
-}
-
-/// Delegate called when a source control operation has completed: launch the next one and manage notifications
-void SUnityVersionControlSettings::OnSourceControlOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult)
-{
-	RemoveInProgressNotification();
-
-	// Report result with a notification
-	if (InResult == ECommandResult::Succeeded)
-	{
-		DisplaySuccessNotification(InOperation->GetName());
-	}
-	else
-	{
-		DisplayFailureNotification(InOperation->GetName());
-	}
-
-	// Launch the following asynchronous operation
-	if ((InOperation->GetName() == "MakeWorkspace") && (InResult == ECommandResult::Succeeded) && bAutoInitialCommit)
-	{
-		// 2. Add .uproject, Config/, Content/ and Source/ files (and ignore.conf if any)
-		LaunchMarkForAddOperation();
-	}
-	else if ((InOperation->GetName() == "MarkForAdd") && (InResult == ECommandResult::Succeeded) && bAutoInitialCommit)
-	{
-		// 3. optional initial Asynchronous commit with custom message: launch a "CheckIn" Operation
-		LaunchCheckInOperation();
-	}
-}
-
-// Display an ongoing notification during the whole operation
-void SUnityVersionControlSettings::DisplayInProgressNotification(const FText& InOperationInProgressString)
-{
-	if (!OperationInProgressNotification.IsValid())
-	{
-		FNotificationInfo Info(InOperationInProgressString);
-		Info.bFireAndForget = false;
-		Info.ExpireDuration = 0.0f;
-		Info.FadeOutDuration = 1.0f;
-		OperationInProgressNotification = FSlateNotificationManager::Get().AddNotification(Info);
-		if (OperationInProgressNotification.IsValid())
-		{
-			OperationInProgressNotification.Pin()->SetCompletionState(SNotificationItem::CS_Pending);
-		}
-	}
-}
-
-// Remove the ongoing notification at the end of the operation
-void SUnityVersionControlSettings::RemoveInProgressNotification()
-{
-	if (OperationInProgressNotification.IsValid())
-	{
-		OperationInProgressNotification.Pin()->ExpireAndFadeout();
-		OperationInProgressNotification.Reset();
-	}
-}
-
-// Display a temporary success notification at the end of the operation
-void SUnityVersionControlSettings::DisplaySuccessNotification(const FName& InOperationName)
-{
-	const FText NotificationText = FText::Format(LOCTEXT("InitWorkspace_Success", "{0} operation was successful!"), FText::FromName(InOperationName));
-	FNotificationInfo Info(NotificationText);
-	Info.bUseSuccessFailIcons = true;
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-	Info.Image = FAppStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#else
-	Info.Image = FEditorStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#endif
-	FSlateNotificationManager::Get().AddNotification(Info);
-	UE_LOG(LogSourceControl, Verbose, TEXT("%s"), *NotificationText.ToString());
-}
-
-// Display a temporary failure notification at the end of the operation
-void SUnityVersionControlSettings::DisplayFailureNotification(const FName& InOperationName)
-{
-	const FText NotificationText = FText::Format(LOCTEXT("InitWorkspace_Failure", "Error: {0} operation failed!"), FText::FromName(InOperationName));
-	FNotificationInfo Info(NotificationText);
-	Info.ExpireDuration = 8.0f;
-	FSlateNotificationManager::Get().AddNotification(Info);
-	UE_LOG(LogSourceControl, Error, TEXT("%s"), *NotificationText.ToString());
 }
 
 /** Delegate to check for presence of an ignore.conf file to an existing Unity Version Control workspace */
@@ -785,24 +636,6 @@ bool SUnityVersionControlSettings::CreateIgnoreFile() const
 {
 	const FString IgnoreFileContent = TEXT("Binaries\nBuild\nDerivedDataCache\nIntermediate\nSaved\nScript\nenc_temp_folder\n.idea\n.vscode\n.vs\n.ignore\n*.VC.db\n*.opensdf\n*.opendb\n*.sdf\n*.sln\n*.suo\n*.code-workspace\n*.xcodeproj\n*.xcworkspace");
 	return FFileHelper::SaveStringToFile(IgnoreFileContent, *GetIgnoreFileName(), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
-}
-
-/** List of files to add to Source Control (.uproject, Config/, Content/, Source/ files and ignore.conf if any) */
-TArray<FString> SUnityVersionControlSettings::GetProjectFiles() const
-{
-	TArray<FString> ProjectFiles;
-	ProjectFiles.Add(FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath()));
-	ProjectFiles.Add(FPaths::ConvertRelativePathToFull(FPaths::ProjectConfigDir()));
-	ProjectFiles.Add(FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()));
-	if (FPaths::DirectoryExists(FPaths::GameSourceDir()))
-	{
-		ProjectFiles.Add(FPaths::ConvertRelativePathToFull(FPaths::GameSourceDir()));
-	}
-	if (FPaths::FileExists(GetIgnoreFileName()))
-	{
-		ProjectFiles.Add(GetIgnoreFileName());
-	}
-	return ProjectFiles;
 }
 
 #undef LOCTEXT_NAMESPACE

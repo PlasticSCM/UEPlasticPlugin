@@ -4,7 +4,6 @@
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlState.h"
 #include "UnityVersionControlUtils.h"
-#include "SUnityVersionControlSettings.h"
 
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"

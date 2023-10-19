@@ -98,11 +98,11 @@ void FPlasticSourceControlMenu::ExtendRevisionControlMenu()
 		if (UToolMenu* SourceControlMenu = ToolMenus->ExtendMenu("StatusBar.ToolBar.SourceControl"))
 		{
 			// Merge the main actions into the existing source control actions, at the top of the menu
-			FToolMenuSection& ActionsSection = SourceControlMenu->FindOrAddSection("SourceControlActions");
-			AddMenuActions(ActionsSection);
+			// TODO POC REVIEW is it really a good idea to change anything of it? It turns out that I don't think so
+//			FToolMenuSection& ActionsSection = SourceControlMenu->FindOrAddSection("SourceControlActions");
 
 			// Create a dedicated section for Unity Version Control submenus
-			FToolMenuSection& UnityVersionControlSection = SourceControlMenu->AddSection("UnityVersionControlSection", LOCTEXT("UnityVersionControlMenuHeading", "Unity Version Control"));
+			FToolMenuSection& UnityVersionControlSection = SourceControlMenu->AddSection("UnityVersionControlSection", LOCTEXT("UnityVersionControlMenuHeading", "Unity Version Control"), FToolMenuInsert(NAME_None, EToolMenuInsertType::First));
 			UnityVersionControlSection.AddSubMenu(
 				TEXT("PlasticSettingsSubMenu"),
 				LOCTEXT("PlasticSettingsSubMenu", "Settings"),
@@ -115,11 +115,27 @@ void FPlasticSourceControlMenu::ExtendRevisionControlMenu()
 				FSlateIcon(FEditorStyle::GetStyleSetName(), "ProjectSettings.TabIcon")
 #endif
 			);
+
 			UnityVersionControlSection.AddSubMenu(
 				TEXT("PlasticWebLinksSubMenu"),
 				LOCTEXT("PlasticWebLinksSubMenu", "Web Links"),
 				FText::GetEmpty(),
 				FNewMenuDelegate::CreateRaw(this, &FPlasticSourceControlMenu::GeneratePlasticWebLinksMenu),
+				false,
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Documentation")
+#elif ENGINE_MAJOR_VERSION == 5
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "Icons.Documentation")
+#elif ENGINE_MAJOR_VERSION == 4
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "LevelEditor.BrowseDocumentation")
+#endif
+			);
+			
+			UnityVersionControlSection.AddSubMenu(
+				TEXT("PlasticAdvancedSubMenu"),
+				LOCTEXT("PlasticAdvancedSubMenu", "Advanced"),
+				FText::GetEmpty(),
+				FNewMenuDelegate::CreateRaw(this, &FPlasticSourceControlMenu::GeneratePlasticAdvancedMenu),
 				false,
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 				FSlateIcon(FAppStyle::GetAppStyleSetName(), "Icons.Documentation")
@@ -136,7 +152,25 @@ void FPlasticSourceControlMenu::ExtendRevisionControlMenu()
 			//   - delete?
 			//   - rename?
 			// TODO add "Create branch"
+			UnityVersionControlSection.AddSubMenu(
+				TEXT("PlasticBranchesSubMenu"),
+				LOCTEXT("PlasticBranchesSubMenu", "Branches"),
+				FText::GetEmpty(),
+				FNewMenuDelegate::CreateRaw(this, &FPlasticSourceControlMenu::GeneratePlasticBranchesMenu),
+				false,
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Branch")
+#elif ENGINE_MAJOR_VERSION == 5
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch")
+#elif ENGINE_MAJOR_VERSION == 4
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch")
+#endif
+			);
 
+			UnityVersionControlSection.AddSeparator("PlasticSeparator");
+
+			// TODO POC REVIEW at the end of the Unity Version Control section so it's close to the original Source Control Actions
+			AddMenuActions(UnityVersionControlSection);
 
 			// TODO: try to also extend "SourceControlSubMenu", to add another section below "AssetSourceControlActions"
 			// Note: inspired by FConcertWorkspaceUI::ExtendAssetContextMenuOptions()
@@ -154,23 +188,23 @@ void FPlasticSourceControlMenu::ExtendToolbarWithSourceControlMenu()
 	// TODO	const FToolMenuOwnerScoped SourceControlMenuOwner(PlasticBranchToolbarOwnerName);
 
 	/// Inspired by SLevelEditor::RegisterStatusBarTools()
-	/// => see also SUnsavedAssetsStatusBarWidget
+	/// => see also SPlasticSourceControlStatusBar
 
 	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.StatusBar.ToolBar");
 	FToolMenuSection& Section = ToolbarMenu->AddSection("Unity Version Control", FText::GetEmpty(), FToolMenuInsert("SourceControl", EToolMenuInsertType::Before));
 
 	Section.AddEntry(
-		FToolMenuEntry::InitWidget("DerivedDatatatusBar", CreateStatusBarWidget(), FText::GetEmpty(), true, false)
+		FToolMenuEntry::InitWidget("UnityVersionControlStatusBar", CreateStatusBarWidget(), FText::GetEmpty(), true, false)
 	);
 }
 
 
 // TODO move that to a separate file
-// See SUnsavedAssetsStatusBarWidget
+// See SPlasticSourceControlStatusBar
 
 TSharedRef<SWidget> FPlasticSourceControlMenu::CreateStatusBarWidget()
 {
-	return SNew(SUnsavedAssetsStatusBarWidget);
+	return SNew(SPlasticSourceControlStatusBar);
 }
 
 void FPlasticSourceControlMenu::ExtendAssetContextMenu()
@@ -802,24 +836,6 @@ void FPlasticSourceControlMenu::AddMenuActions(FToolMenuSection& Menu)
 			FCanExecuteAction()
 		)
 	);
-
-	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
-		"SwitchToPartialWorkspace",
-#endif
-		LOCTEXT("SwitchToPartialWorkspace",			"Switch to Gluon Partial Workspace"),
-		LOCTEXT("SwitchToPartialWorkspaceTooltip",	"Update the workspace to a Gluon partial mode for a simplified workflow.\n"
-			"Allows to update and check in files individually as opposed to the whole workspace.\nIt doesn't work with branches or shelves."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "GenericCommands.Cut"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "GenericCommands.Cut"),
-#endif
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::SwitchToPartialWorkspaceClicked),
-			FCanExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::CanSwitchToPartialWorkspace)
-		)
-	);
 }
 
 
@@ -917,27 +933,68 @@ void FPlasticSourceControlMenu::GeneratePlasticWebLinksMenu(FMenuBuilder& MenuBu
 				FCanExecuteAction()
 			)
 		);
-
-		FString OrganizationName = FPlasticSourceControlModule::Get().GetProvider().GetCloudOrganization();
-		if (!OrganizationName.IsEmpty())
-		{
-			MenuBuilder.AddMenuEntry(
-				LOCTEXT("PlasticLockRulesURL", "Configure Lock Rules"),
-				LOCTEXT("PlasticLockRulesURLTooltip", "Navigate to lock rules configuration page in the Unity Dashboard."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-				FSlateIcon(FAppStyle::GetAppStyleSetName(), "PropertyWindow.Locked"),
-#else
-				FSlateIcon(FEditorStyle::GetStyleSetName(), "PropertyWindow.Locked"),
-#endif
-				FUIAction(
-					FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitLockRulesURLClicked, MoveTemp(OrganizationName)),
-					FCanExecuteAction()
-				)
-			);
-		}
 	}
 
 	MenuBuilder.EndSection();
+}
+
+void FPlasticSourceControlMenu::GeneratePlasticAdvancedMenu(FMenuBuilder& MenuBuilder)
+{
+	// TODO: we should offer a switch back, even though it has more constraints (requires reverting or shelving all changes)
+	MenuBuilder.AddMenuEntry(
+		LOCTEXT("SwitchToPartialWorkspace", "Switch to Gluon Partial Workspace"),
+		LOCTEXT("SwitchToPartialWorkspaceTooltip", "Update the workspace to a Gluon partial mode for a simplified workflow.\n"
+			"Allows to update and check in files individually as opposed to the whole workspace.\nIt doesn't work with branches or shelves."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "GenericCommands.Cut"),
+#else
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "GenericCommands.Cut"),
+#endif
+		FUIAction(
+			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::SwitchToPartialWorkspaceClicked),
+			FCanExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::CanSwitchToPartialWorkspace)
+		)
+	);
+
+	FString OrganizationName = FPlasticSourceControlModule::Get().GetProvider().GetCloudOrganization();
+	if (!OrganizationName.IsEmpty())
+	{
+		MenuBuilder.AddMenuEntry(
+			LOCTEXT("PlasticLockRulesURL", "Configure Lock Rules"),
+			LOCTEXT("PlasticLockRulesURLTooltip", "Navigate to lock rules configuration page in the Unity Dashboard."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+			FSlateIcon(FAppStyle::GetAppStyleSetName(), "PropertyWindow.Locked"),
+#else
+			FSlateIcon(FEditorStyle::GetStyleSetName(), "PropertyWindow.Locked"),
+#endif
+			FUIAction(
+				FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitLockRulesURLClicked, MoveTemp(OrganizationName)),
+				FCanExecuteAction()
+			)
+		);
+	}
+}
+
+void FPlasticSourceControlMenu::GeneratePlasticBranchesMenu(FMenuBuilder& MenuBuilder)
+{	
+	MenuBuilder.AddMenuEntry(
+		LOCTEXT("CreateBranch", "Create a new branch"),
+		LOCTEXT("CreateBranchTooltip", "Create and optionally switch to a new branch."),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitSupportURLClicked), // TODO POC
+			FCanExecuteAction()
+		)
+	);
+	MenuBuilder.AddMenuEntry(
+		LOCTEXT("SwitchToBranch", "Switch to an existing branch"),
+		LOCTEXT("SwitchToBranchTooltip", "Submit a support request for Unity Version Control (formerly Plastic SCM)."),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitSupportURLClicked), // TODO POC
+			FCanExecuteAction()
+		)
+	);
 }
 
 #if ENGINE_MAJOR_VERSION == 4
@@ -957,7 +1014,7 @@ TSharedRef<FExtender> FPlasticSourceControlMenu::OnExtendLevelEditorViewMenu(con
 
 
 
-void SUnsavedAssetsStatusBarWidget::Construct(const FArguments& InArgs)
+void SPlasticSourceControlStatusBar::Construct(const FArguments& InArgs)
 {
 	ChildSlot
 	[
@@ -965,7 +1022,7 @@ void SUnsavedAssetsStatusBarWidget::Construct(const FArguments& InArgs)
 		.ContentPadding(FMargin(6.0f, 0.0f))
 		.ToolTipText_Lambda([this]() { return GetStatusBarTooltip(); })
 		.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-		.OnClicked(InArgs._OnClicked)
+		.OnClicked(this, &SPlasticSourceControlStatusBar::OnClicked)
 		[
 			SNew(SHorizontalBox)
 			+ SHorizontalBox::Slot()
@@ -989,20 +1046,83 @@ void SUnsavedAssetsStatusBarWidget::Construct(const FArguments& InArgs)
 	];
 }
 
-const FSlateBrush* SUnsavedAssetsStatusBarWidget::GetStatusBarIcon() const
+const FSlateBrush* SPlasticSourceControlStatusBar::GetStatusBarIcon() const
 {
 	// TODO plastic log? branch logo?
 	return FAppStyle::GetBrush("SourceControl.Branch");
 }
 
-FText SUnsavedAssetsStatusBarWidget::GetStatusBarText() const
+FText SPlasticSourceControlStatusBar::GetStatusBarText() const
 {;
 	return FText::FromString(FPlasticSourceControlModule::Get().GetProvider().GetBranchName());
 }
 
-FText SUnsavedAssetsStatusBarWidget::GetStatusBarTooltip() const
+FText SPlasticSourceControlStatusBar::GetStatusBarTooltip() const
 {
 	return LOCTEXT("Branches_Tooltip", "Switch to another branch.");
+}
+
+
+FReply SPlasticSourceControlStatusBar::OnClicked()
+{
+	// TODO POC 
+
+	// Create the window
+	PlasticSourceControlBranchesWindowPtr = SNew(SWindow)
+		.Title(LOCTEXT("PlasticBranchesTitle", "Branches"))
+		.HasCloseButton(true)
+		.SupportsMaximize(false)
+		.SupportsMinimize(false)
+		.SizingRule(ESizingRule::Autosized);
+
+	// Set the closed callback
+	PlasticSourceControlBranchesWindowPtr->SetOnWindowClosed(FOnWindowClosed::CreateRaw(this, &SPlasticSourceControlStatusBar::OnSourceControlDialogClosed));
+
+	// Setup the content for the created login window.
+	PlasticSourceControlBranchesWindowPtr->SetContent(
+		SAssignNew(PlasticSourceControlBranchesContentPtr, SPlasticSourceControlBranches)
+	);
+
+	TSharedPtr<SWindow> RootWindow = FGlobalTabmanager::Get()->GetRootWindow();
+	if (RootWindow.IsValid())
+	{
+		FSlateApplication::Get().AddWindowAsNativeChild(PlasticSourceControlBranchesWindowPtr.ToSharedRef(), RootWindow.ToSharedRef());
+	}
+	else
+	{
+		FSlateApplication::Get().AddWindow(PlasticSourceControlBranchesWindowPtr.ToSharedRef());
+	}
+	return FReply::Handled();
+}
+
+void SPlasticSourceControlStatusBar::OnSourceControlDialogClosed(const TSharedRef<class SWindow>& InWindow)
+{
+	PlasticSourceControlBranchesWindowPtr = NULL;
+	PlasticSourceControlBranchesContentPtr = NULL;
+}
+
+
+// TODO POC : on clic display popup to select branch from a list using filters
+void SPlasticSourceControlBranches::Construct(const FArguments& InArgs)
+{
+	ChildSlot
+	[
+		SNew(SVerticalBox)
+		+SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(2.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SHorizontalBox)
+			.ToolTipText(LOCTEXT("PlasticBranches_Tooltip", "List of branches in the repository"))
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("PlasticBranchesTitle", "Branches"))
+			]
+		]
+	];
 }
 
 #undef LOCTEXT_NAMESPACE

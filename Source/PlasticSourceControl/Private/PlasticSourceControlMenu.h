@@ -6,6 +6,8 @@
 #include "ISourceControlProvider.h"
 #include "Runtime/Launch/Resources/Version.h"
 
+#if SOURCE_CONTROL_WITH_SLATE
+
 class FMenuBuilder;
 struct FToolMenuSection;
 
@@ -49,6 +51,8 @@ private:
 	/** Called to generate sub menus. */
 	void GeneratePlasticSettingsMenu(FMenuBuilder& MenuBuilder);
 	void GeneratePlasticWebLinksMenu(FMenuBuilder& MenuBuilder);
+	void GeneratePlasticAdvancedMenu(FMenuBuilder& MenuBuilder);
+	void GeneratePlasticBranchesMenu(FMenuBuilder& MenuBuilder);
 
 
 	// TODO REVIEW POC to be renamed and reworked as needed
@@ -56,6 +60,7 @@ private:
 	/** Extends the toolbar with MU source control options */
 	void ExtendToolbarWithSourceControlMenu();
 	TSharedRef<SWidget> CreateStatusBarWidget();
+
 
 
 	/** Extends the main Revision Control menu from the toolbar at the bottom-right. */
@@ -100,29 +105,50 @@ private:
 };
 
 
-// TODO move this to a separate file, with a different name etc!
+// TODO POC move this to a separate file, with a different name etc!
+
+class SPlasticSourceControlBranches : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SPlasticSourceControlBranches) {}
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs);
+
+private:
+
+};
 
 /**
  * Tracks assets that has in-memory modification not saved to disk yet and checks
  * the source control states of those assets when a source control provider is available.
  */
-class SUnsavedAssetsStatusBarWidget : public SCompoundWidget
+class SPlasticSourceControlStatusBar : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SUnsavedAssetsStatusBarWidget)
-	{}
-	/** Event fired when the status bar button is clicked */
-	SLATE_EVENT(FOnClicked, OnClicked)
-		SLATE_END_ARGS()
+	SLATE_BEGIN_ARGS(SPlasticSourceControlStatusBar)	{}
+	SLATE_END_ARGS()
 
-		/** Constructs the widget */
-		void Construct(const FArguments& InArgs);
+	void Construct(const FArguments& InArgs);
 
 private:
 	const FSlateBrush* GetStatusBarIcon() const;
 	FText GetStatusBarText() const;
 	FText GetStatusBarTooltip() const;
 
+	FReply OnClicked();
+
+	/** Delegate called when the source control window is closed */
+	void OnSourceControlDialogClosed(const TSharedRef<class SWindow>& InWindow);
+
 private:
+	// TODO even more POC from FSourceControlModule
+
+	/** The login window we may be using */
+	TSharedPtr<SWindow> PlasticSourceControlBranchesWindowPtr;
+
+	/** The login window control we may be using */
+	TSharedPtr<class SPlasticSourceControlBranches> PlasticSourceControlBranchesContentPtr;
 };
 
+#endif

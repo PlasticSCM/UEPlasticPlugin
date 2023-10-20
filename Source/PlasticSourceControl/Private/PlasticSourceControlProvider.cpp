@@ -552,12 +552,12 @@ bool FPlasticSourceControlProvider::AllowsDiffAgainstDepot() const
 
 TOptional<bool> FPlasticSourceControlProvider::IsAtLatestRevision() const
 {
-	return TOptional<bool>(); // NOTE: used by code in UE5's Status Bar but currently dormant as far as I can tell
+	return TOptional<bool>(true); // NOTE: used by code in UE5's Status Bar but currently only used by Unreal Revision Control for UEFN
 }
 
 TOptional<int> FPlasticSourceControlProvider::GetNumLocalChanges() const
 {
-	return TOptional<int>(); // NOTE: used by code in UE5's Status Bar but currently dormant as far as I can tell
+	return TOptional<int>(1); // NOTE: used by code in UE5's Status Bar but currently only used by Unreal Revision Control for UEFN
 }
 
 TSharedPtr<IPlasticSourceControlWorker, ESPMode::ThreadSafe> FPlasticSourceControlProvider::CreateWorker(const FName& InOperationName)

@@ -2,6 +2,8 @@
 
 #include "PlasticSourceControlMenu.h"
 
+#if SOURCE_CONTROL_WITH_SLATE
+
 #include "PlasticSourceControlModule.h"
 #include "PlasticSourceControlProvider.h"
 #include "PlasticSourceControlOperations.h"
@@ -35,8 +37,8 @@
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 
-FName FPlasticSourceControlMenu::UnityVersionControlMainMenuOwnerName = TEXT("UnityVersionControlMenu");
-FName FPlasticSourceControlMenu::UnityVersionControlAssetContextLocksMenuOwnerName = TEXT("UnityVersionControlContextLocksMenu");
+static const FName UnityVersionControlMainMenuOwnerName = TEXT("UnityVersionControlMenu");
+static const FName UnityVersionControlAssetContextLocksMenuOwnerName = TEXT("UnityVersionControlContextLocksMenu");
 
 void FPlasticSourceControlMenu::Register()
 {
@@ -206,6 +208,7 @@ TSharedRef<SWidget> FPlasticSourceControlMenu::CreateStatusBarWidget()
 {
 	return SNew(SPlasticSourceControlStatusBar);
 }
+
 
 void FPlasticSourceControlMenu::ExtendAssetContextMenu()
 {
@@ -1083,6 +1086,9 @@ FReply SPlasticSourceControlStatusBar::OnClicked()
 		SAssignNew(PlasticSourceControlBranchesContentPtr, SPlasticSourceControlBranches)
 	);
 
+	FPlasticSourceControlModule::Get().GetUnityVersionControlWindow().OpenTab();
+
+	/*
 	TSharedPtr<SWindow> RootWindow = FGlobalTabmanager::Get()->GetRootWindow();
 	if (RootWindow.IsValid())
 	{
@@ -1092,6 +1098,7 @@ FReply SPlasticSourceControlStatusBar::OnClicked()
 	{
 		FSlateApplication::Get().AddWindow(PlasticSourceControlBranchesWindowPtr.ToSharedRef());
 	}
+	*/
 	return FReply::Handled();
 }
 
@@ -1103,6 +1110,12 @@ void SPlasticSourceControlStatusBar::OnSourceControlDialogClosed(const TSharedRe
 
 
 // TODO POC : on clic display popup to select branch from a list using filters
+
+// Let's perhaps take inspiration from
+// /** Panel designed to display the revision history of a package */
+// class SSourceControlHistoryWidget : public SCompoundWidget
+
+
 void SPlasticSourceControlBranches::Construct(const FArguments& InArgs)
 {
 	ChildSlot
@@ -1126,3 +1139,5 @@ void SPlasticSourceControlBranches::Construct(const FArguments& InArgs)
 }
 
 #undef LOCTEXT_NAMESPACE
+
+#endif

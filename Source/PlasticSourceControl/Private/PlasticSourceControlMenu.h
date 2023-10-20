@@ -61,8 +61,6 @@ private:
 	void ExtendToolbarWithSourceControlMenu();
 	TSharedRef<SWidget> CreateStatusBarWidget();
 
-
-
 	/** Extends the main Revision Control menu from the toolbar at the bottom-right. */
 	void ExtendRevisionControlMenu();
 	/** Extends the content browser asset context menu with Admin revision control options. */
@@ -91,11 +89,6 @@ private:
 
 	/** Current source control operation from extended menu if any */
 	TWeakPtr<class SNotificationItem> OperationInProgressNotification;
-
-	/** Name of the menu extension going into the global Revision Control (on the toolbar at the bottom-right) */
-	static FName UnityVersionControlMainMenuOwnerName;
-	/** Name of the asset context menu extension for admin actions over Locks */
-	static FName UnityVersionControlAssetContextLocksMenuOwnerName;
 
 	/** Delegates called when a source control operation has completed */
 	void OnSyncAllOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult);

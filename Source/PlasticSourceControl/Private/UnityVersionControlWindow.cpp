@@ -62,19 +62,17 @@ void SDerivedDataCacheStatisticsDialog::Construct(const FArguments& InArgs)
 	[
 		SNew(SVerticalBox)
 		+ SVerticalBox::Slot()
-		.Padding(0, 20, 0, 0)
 		.AutoHeight()
 		[
 			SNew(SHorizontalBox)
+			// TODO: how to add a search icon?
 			+SHorizontalBox::Slot()
-			.FillWidth(1.0f)
 			[
-				SNew(STextBlock)
-				.Margin(TitleMargin)
-				.ColorAndOpacity(TitleColor)
-				.Font(TitleFont)
+				// TODO: Filter (like the Desktop app) or Search (like the Unity Plugin)?
+				SNew(SEditableTextBox)
 				.Justification(ETextJustify::Left)
-				.Text(LOCTEXT("UnityVersionControl_Branches", "Branches"))
+				.HintText(LOCTEXT("Filter", "Filter"))
+				.OnTextChanged(this, &SDerivedDataCacheStatisticsDialog::OnFilterTextChanged)
 			]
 		]
 		+ SVerticalBox::Slot()
@@ -86,8 +84,16 @@ void SDerivedDataCacheStatisticsDialog::Construct(const FArguments& InArgs)
 		]
 	];
 
-	RegisterActiveTimer(0.5f, FWidgetActiveTimerDelegate::CreateSP(this, &SDerivedDataCacheStatisticsDialog::UpdateGridPanels));
+	RegisterActiveTimer(60.f, FWidgetActiveTimerDelegate::CreateSP(this, &SDerivedDataCacheStatisticsDialog::UpdateGridPanels));
 }
+
+void SDerivedDataCacheStatisticsDialog::OnFilterTextChanged(const FText& SearchText)
+{
+	FilterText = SearchText.ToString();
+
+	UpdateGridPanels(0.0, 0.0f);
+}
+
 
 EActiveTimerReturnType SDerivedDataCacheStatisticsDialog::UpdateGridPanels(double InCurrentTime, float InDeltaTime)
 {
@@ -100,7 +106,6 @@ EActiveTimerReturnType SDerivedDataCacheStatisticsDialog::UpdateGridPanels(doubl
 
 	return EActiveTimerReturnType::Continue;
 }
-
 
 TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 {
@@ -162,8 +167,15 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 
 
 	// POC
-	for (int32 i = 0; i < 3; i++)
+	for (int32 i = 0; i < 10; i++)
 	{
+		// POC generate branch names
+		FString BranchName = (i == 0) ? FString(TEXT("/main")) : FString::Printf(TEXT("/main/scm10020%d"), i * i);
+		if (BranchName.Find(FilterText) == INDEX_NONE)
+		{
+			continue;
+		}
+
 		Row++;
 
 		Panel->AddSlot(0, Row)
@@ -172,15 +184,15 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		];
 
 		Panel->AddSlot(1, Row)
-		.HAlign(HAlign_Right)
+		.HAlign(HAlign_Left)
 		[
 			SNew(STextBlock)
 			.Margin(DefaultMargin)
-			.Text(FText::FromString(TEXT("/main")))
+			.Text(FText::FromString(BranchName))
 		];
 
 		Panel->AddSlot(2, Row)
-		.HAlign(HAlign_Right)
+		.HAlign(HAlign_Left)
 		[
 			SNew(STextBlock)
 			.Margin(DefaultMargin)
@@ -188,7 +200,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		];
 
 		Panel->AddSlot(3, Row)
-		.HAlign(HAlign_Right)
+		.HAlign(HAlign_Left)
 		[
 			SNew(STextBlock)
 			.Margin(DefaultMargin)
@@ -196,7 +208,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		];
 
 		Panel->AddSlot(4, Row)
-		.HAlign(HAlign_Right)
+		.HAlign(HAlign_Left)
 		[
 			SNew(STextBlock)
 			.Margin(DefaultMargin)

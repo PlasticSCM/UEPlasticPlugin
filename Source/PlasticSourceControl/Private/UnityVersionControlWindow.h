@@ -31,8 +31,11 @@ private:
 
 	TSharedRef<SWidget> GetGridPanel();
 
-	// TODO: timer to replace by a binding with the search field (OnTextChanged)
 	EActiveTimerReturnType UpdateGridPanels(double InCurrentTime, float InDeltaTime);
 
 	SVerticalBox::FSlot* GridSlot = nullptr;
+
+	FString FilterText;
+
+	void OnFilterTextChanged(const FText& SearchText);
 };

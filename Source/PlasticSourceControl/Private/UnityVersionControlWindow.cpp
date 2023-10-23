@@ -50,8 +50,24 @@ void FUnityVersionControlWindow::OpenTab()
 }
 
 
+// TODO POC
+static TSharedPtr<SDerivedDataCacheStatisticsDialog> PinnedHistoryWidget;
+
+// POC context menu
+const FName DerivedDataCacheStatisticsContextMenu = TEXT("DerivedDataCacheStatistics.ContextMenu");
+
 void SDerivedDataCacheStatisticsDialog::Construct(const FArguments& InArgs)
 {
+	PinnedHistoryWidget = SharedThis(this);
+
+	if (!UToolMenus::Get()->IsMenuRegistered(DerivedDataCacheStatisticsContextMenu))
+	{
+		UToolMenu* ContextMenu = UToolMenus::Get()->RegisterMenu(DerivedDataCacheStatisticsContextMenu);
+		ContextMenu->bShouldCloseWindowAfterMenuSelection = true;
+
+		ContextMenu->AddDynamicSection(NAME_None, FNewToolMenuDelegate::CreateStatic(&SDerivedDataCacheStatisticsDialog::CreateDiffMenu));
+	}
+
 	const float RowMargin = 0.0f;
 	const float TitleMargin = 10.0f;
 	const float ColumnMargin = 10.0f;
@@ -73,6 +89,7 @@ void SDerivedDataCacheStatisticsDialog::Construct(const FArguments& InArgs)
 				.Justification(ETextJustify::Left)
 				.HintText(LOCTEXT("Filter", "Filter"))
 				.OnTextChanged(this, &SDerivedDataCacheStatisticsDialog::OnFilterTextChanged)
+				.OnContextMenuOpening(this, &SDerivedDataCacheStatisticsDialog::OnCreateContextMenu)
 			]
 		]
 		+ SVerticalBox::Slot()
@@ -170,8 +187,13 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 	for (int32 i = 0; i < 10; i++)
 	{
 		// POC generate branch names
-		FString BranchName = (i == 0) ? FString(TEXT("/main")) : FString::Printf(TEXT("/main/scm10020%d"), i * i);
-		if (BranchName.Find(FilterText) == INDEX_NONE)
+		const FString BranchName = (i == 0) ? FString(TEXT("/main")) : FString::Printf(TEXT("/main/scm%d"), 100271 + (i * i));
+		const FString BranchCreatedBy = TEXT("sebastien.rombauts@unity3d.com");
+		const FString BranchCreationDate = TEXT("23/10/2023 14:24:14");
+		const FString BranchComment = FString::Printf(TEXT("Proof of Concept comment for branch %s"), *BranchName);
+
+		// Filter branches on name, auther and comment
+		if ((BranchName.Find(FilterText) == INDEX_NONE) && (BranchCreatedBy.Find(FilterText) == INDEX_NONE) && (BranchComment.Find(FilterText) == INDEX_NONE))
 		{
 			continue;
 		}
@@ -196,7 +218,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		[
 			SNew(STextBlock)
 			.Margin(DefaultMargin)
-			.Text(FText::FromString(TEXT("sebastien.rombauts@unity3d.com")))
+			.Text(FText::FromString(BranchCreatedBy))
 		];
 
 		Panel->AddSlot(3, Row)
@@ -204,7 +226,7 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		[
 			SNew(STextBlock)
 			.Margin(DefaultMargin)
-			.Text(FText::FromString(TEXT("23/10/2023 14:24:14")))
+			.Text(FText::FromString(BranchCreationDate))
 		];
 
 		Panel->AddSlot(4, Row)
@@ -212,11 +234,77 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 		[
 			SNew(STextBlock)
 			.Margin(DefaultMargin)
-			.Text(FText::FromString(TEXT("Proof of concept branch")))
+			.Text(FText::FromString(BranchComment))
 		];
 	}
 
 	return Panel;
+}
+
+void SDerivedDataCacheStatisticsDialog::CreateDiffMenu(UToolMenu* InToolMenu)
+{
+
+	if (!PinnedHistoryWidget)
+	{
+		return;
+	}
+
+	FToolMenuSection& Section = InToolMenu->AddSection("Section");
+	Section.AddMenuEntry(
+		TEXT("CreateChildBranch"),
+		LOCTEXT("CreateChildBranch", "Create child branch"),
+		LOCTEXT("CreateChildBranchTooltip", "Create child branch."),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP(PinnedHistoryWidget.Get(), &SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev)
+		)
+	);
+	Section.AddMenuEntry(
+		TEXT("SwitchToBranch"),
+		LOCTEXT("SwitchTo", "Switch workspace to this branch"),
+		LOCTEXT("SwitchToTooltip", "Switch workspace to this branch."),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP(PinnedHistoryWidget.Get(), &SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev)
+		)
+	);
+
+	Section.AddSeparator("PlasticSeparator");
+
+	Section.AddMenuEntry(
+		TEXT("RenameBranch"),
+		LOCTEXT("RenameBranch", "Rename branch"),
+		LOCTEXT("RenameBranchTooltip", "Rename branch."),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP(PinnedHistoryWidget.Get(), &SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev)
+		)
+	);
+	Section.AddMenuEntry(
+		TEXT("DeleteBranch"),
+		LOCTEXT("DeleteBranch", "Delete branch"),
+		LOCTEXT("DeleteBranchTooltip", "Delete branch."),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP(PinnedHistoryWidget.Get(), &SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev)
+		)
+	);
+
+}
+
+void SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev()
+{
+}
+
+TSharedPtr<SWidget> SDerivedDataCacheStatisticsDialog::OnCreateContextMenu()
+{
+	FToolMenuContext Context;
+	if (UToolMenu* GeneratedContextMenu = UToolMenus::Get()->GenerateMenu(DerivedDataCacheStatisticsContextMenu, Context))
+	{
+		return UToolMenus::Get()->GenerateWidget(GeneratedContextMenu);
+	}
+
+	return SNullWidget::NullWidget;
 }
 
 #undef LOCTEXT_NAMESPACE

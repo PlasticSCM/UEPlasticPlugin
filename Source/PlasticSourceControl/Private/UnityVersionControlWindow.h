@@ -38,4 +38,8 @@ private:
 	FString FilterText;
 
 	void OnFilterTextChanged(const FText& SearchText);
+
+	static void CreateDiffMenu(UToolMenu* InToolMenu);
+	void OnDiffAgainstPreviousRev();
+	TSharedPtr<SWidget> OnCreateContextMenu();
 };

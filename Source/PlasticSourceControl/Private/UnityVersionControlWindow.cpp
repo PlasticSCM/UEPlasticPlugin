@@ -20,7 +20,7 @@ void FUnityVersionControlWindow::Register()
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(UnityVersionControlWindowTabName, FOnSpawnTab::CreateRaw(this, &FUnityVersionControlWindow::OnSpawnTab))
 		.SetDisplayName(LOCTEXT("UnityVersionControlWindowTabTitle", "Unity Version Control"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden)
-	.SetIcon(FSlateIcon(FUnityVersionControlStyle::Get().GetStyleSetName(), "UnityVersionControlWindow.PluginIcon.Small"));
+	.SetIcon(FSlateIcon(FUnityVersionControlStyle::Get().GetStyleSetName(), "UnityVersionControl.PluginIcon.Small"));
 }
 
 void FUnityVersionControlWindow::Unregister()

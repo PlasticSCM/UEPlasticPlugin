@@ -6,20 +6,28 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
+#include "UnityVersionControlStyle.h"
+
 static const FName UnityVersionControlWindowTabName("UnityVersionControlWindow");
 
 #define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
 
 void FUnityVersionControlWindow::Register()
 {
+	FUnityVersionControlStyle::Initialize();
+	FUnityVersionControlStyle::ReloadTextures();
+
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(UnityVersionControlWindowTabName, FOnSpawnTab::CreateRaw(this, &FUnityVersionControlWindow::OnSpawnPluginTab))
 		.SetDisplayName(LOCTEXT("UnityVersionControlWindowTabTitle", "Unity Version Control"))
-		.SetMenuType(ETabSpawnerMenuType::Hidden);
+		.SetMenuType(ETabSpawnerMenuType::Hidden)
+	.SetIcon(FSlateIcon(FUnityVersionControlStyle::Get().GetStyleSetName(), "UnityVersionControlWindow.PluginIcon.Small"));
 }
 
 void FUnityVersionControlWindow::Unregister()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(UnityVersionControlWindowTabName);
+
+	FUnityVersionControlStyle::Shutdown();
 }
 
 TSharedRef<SDockTab> FUnityVersionControlWindow::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)

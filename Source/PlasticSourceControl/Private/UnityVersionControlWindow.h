@@ -71,4 +71,28 @@ private:
 	static void CreatePOCMenu(UToolMenu* InToolMenu);
 	void OnPOCMenuAction();
 	TSharedPtr<SWidget> OnCreateContextMenu();
+
+	/** Delegate called when the source control window is closed */
+	void OnCreateBranchDialogClosed(const TSharedRef<class SWindow>& InWindow);
+
+	/** The create branch window we may be using */
+	TSharedPtr<SWindow> CreateBranchWindowPtr;
+
+	/** The create branch window control we may be using */
+	TSharedPtr<class SCreateBranch> CreateBranchContentPtr;
 };
+
+// TODO POC move this to a separate file, with a different name etc!
+
+class SCreateBranch : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SCreateBranch) {}
+	SLATE_END_ARGS()
+
+	void Construct(const FArguments& InArgs);
+
+private:
+
+};
+

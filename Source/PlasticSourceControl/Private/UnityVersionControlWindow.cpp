@@ -3,6 +3,9 @@
 #include "UnityVersionControlWindow.h"
 
 #include "Widgets/Docking/SDockTab.h"
+#include "Widgets/Images/SImage.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -76,13 +79,18 @@ void SBranchesWidget::Construct(const FArguments& InArgs)
 		.AutoHeight()
 		[
 			SNew(SHorizontalBox)
-			// TODO: how to add a search icon?
+			+SHorizontalBox::Slot()
+			.AutoWidth()
+			.VAlign(VAlign_Center)
+			[
+				SNew(SImage)
+				.Image(FAppStyle::GetBrush("Icons.Search"))
+			]
 			+SHorizontalBox::Slot()
 			[
-				// TODO: Filter (like the Desktop app) or Search (like the Unity Plugin)?
 				SNew(SEditableTextBox)
 				.Justification(ETextJustify::Left)
-				.HintText(LOCTEXT("Filter", "Filter"))
+				.HintText(LOCTEXT("Search", "Search"))
 				.OnTextChanged(this, &SBranchesWidget::OnFilterTextChanged)
 				.OnContextMenuOpening(this, &SBranchesWidget::OnCreateContextMenu)
 			]
@@ -295,6 +303,30 @@ void SBranchesWidget::CreatePOCMenu(UToolMenu* InToolMenu)
 
 void SBranchesWidget::OnPOCMenuAction()
 {
+	// Create branch popup window
+	CreateBranchWindowPtr = SNew(SWindow)
+		.Title(LOCTEXT("PlasticCreateBranchTitle", "Create Branch"))
+		.HasCloseButton(true)
+		.SupportsMaximize(false)
+		.SupportsMinimize(false)
+		.SizingRule(ESizingRule::Autosized);
+
+	// Set the closed callback
+	CreateBranchWindowPtr->SetOnWindowClosed(FOnWindowClosed::CreateRaw(this, &SBranchesWidget::OnCreateBranchDialogClosed));
+
+	// Setup the content for the created login window.
+	CreateBranchWindowPtr->SetContent(
+		SAssignNew(CreateBranchContentPtr, SCreateBranch)
+	);
+
+	TSharedPtr<SWindow> RootWindow = FGlobalTabmanager::Get()->GetRootWindow();
+	FSlateApplication::Get().AddModalWindow(CreateBranchWindowPtr.ToSharedRef(), RootWindow);
+}
+
+void SBranchesWidget::OnCreateBranchDialogClosed(const TSharedRef<class SWindow>& InWindow)
+{
+	CreateBranchWindowPtr = nullptr;
+	CreateBranchContentPtr = nullptr;
 }
 
 TSharedPtr<SWidget> SBranchesWidget::OnCreateContextMenu()
@@ -311,6 +343,139 @@ TSharedPtr<SWidget> SBranchesWidget::OnCreateContextMenu()
 	}
 
 	return SNullWidget::NullWidget;
+}
+
+// TODO POC :create a new branch
+void SCreateBranch::Construct(const FArguments& InArgs)
+{
+	// TODO POC
+	const FString BranchName = TEXT("/main");
+
+	ChildSlot
+	[
+		SNew(SVerticalBox)
+		+SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(2.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SHorizontalBox)
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("PlasticCreateBranchTitle", "Create branch"))
+			]
+		]
+		+SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(2.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SHorizontalBox)
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(STextBlock)
+				.Text(FText::Format(LOCTEXT("PlasticCreateBrancheDetails", "Create a new child branch from last changeset on br:{0}"), FText::FromString(BranchName)))
+			]
+		]
+		+SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(2.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SHorizontalBox)
+			.ToolTipText(LOCTEXT("PlasticCreateBrancheNameTooltip", "Enter a name for the new branch to create"))
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("PlasticCreateBrancheNameLabel", "Branch name:"))
+			]
+			+SHorizontalBox::Slot()
+			.FillWidth(2.0f)
+			[
+				SNew(SEditableTextBox)
+				// TODO: OnTextCommitted()
+				.HintText(LOCTEXT("PlasticCreateBrancheNameHint", "Name of the new branch"))
+			]
+		]
+		+SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(2.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SHorizontalBox)
+			.ToolTipText(LOCTEXT("PlasticCreateBrancheCommentTooltip", "Enter optional comments for the new branch"))
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("PlasticCreateBrancheCommentLabel", "Comments:"))
+			]
+			+SHorizontalBox::Slot()
+			.FillWidth(2.0f)
+			[
+				SNew(SMultiLineEditableTextBox)
+				.AutoWrapText(true)
+				// TODO: OnTextCommitted()
+				.HintText(LOCTEXT("PlasticCreateBrancheCommentHing", "Comments for the new branch"))
+			]
+		]
+		// Option to switch workspace to this branch
+		+SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(2.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SHorizontalBox)
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(SCheckBox)
+				// TODO POC
+//				.IsChecked(bSwitchWorkspace)
+//				.OnCheckStateChanged(this, &SCreateBranch::OnCheckedSwitchWorkspace)
+				[
+					SNew(STextBlock)
+					.Text(LOCTEXT("PlasticSwitchWorkspace", "Switch workspace to this branch"))
+				]
+			]
+		]
+		// TODO "Create" / "Cancel" buttons
+		+SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(2.0f)
+		.VAlign(VAlign_Center)
+		.HAlign(HAlign_Right)
+		[
+			SNew(SHorizontalBox)
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(SButton)
+				.HAlign(HAlign_Center)
+				.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
+				.Text(NSLOCTEXT("CreateBranch", "Create", "Create"))
+				.ToolTipText(NSLOCTEXT("SourceControl.SubmitPanel", "Save_Tooltip", "Create the branch."))
+				// TODO POC
+//				.OnClicked(this, &SCreateBranch::CreateAndCloseClicked)
+			]
+			+SHorizontalBox::Slot()
+			.FillWidth(1.0f)
+			[
+				SNew(SButton)
+				.HAlign(HAlign_Center)
+				.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
+				.Text(NSLOCTEXT("CreateBranch", "Cancel", "Cancel"))
+				.ToolTipText(NSLOCTEXT("SourceControl.SubmitPanel", "Cancel_Tooltip", "Cancel the creation."))
+				// TODO POC
+//				.OnClicked(this, &SCreateBranch::CancelAndCloseClicked)
+			]
+			// TODO Cancel button
+		]
+	];
 }
 
 #undef LOCTEXT_NAMESPACE

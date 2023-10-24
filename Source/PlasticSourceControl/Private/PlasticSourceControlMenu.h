@@ -31,6 +31,7 @@ public:
 	void VisitDocsURLClicked() const;
 	void VisitSupportURLClicked() const;
 	void VisitLockRulesURLClicked(const FString InOrganizationName) const;
+	void OpenBranchesWindow() const;
 
 private:
 	bool IsSourceControlConnected() const;
@@ -52,7 +53,6 @@ private:
 	void GeneratePlasticSettingsMenu(FMenuBuilder& MenuBuilder);
 	void GeneratePlasticWebLinksMenu(FMenuBuilder& MenuBuilder);
 	void GeneratePlasticAdvancedMenu(FMenuBuilder& MenuBuilder);
-	void GeneratePlasticBranchesMenu(FMenuBuilder& MenuBuilder);
 
 
 	// TODO REVIEW POC to be renamed and reworked as needed
@@ -98,19 +98,7 @@ private:
 };
 
 
-// TODO POC move this to a separate file, with a different name etc!
-
-class SPlasticSourceControlBranches : public SCompoundWidget
-{
-public:
-	SLATE_BEGIN_ARGS(SPlasticSourceControlBranches) {}
-	SLATE_END_ARGS()
-
-	void Construct(const FArguments& InArgs);
-
-private:
-
-};
+// TODO POC move this to a separate file
 
 /**
  * Tracks assets that has in-memory modification not saved to disk yet and checks
@@ -130,18 +118,6 @@ private:
 	FText GetStatusBarTooltip() const;
 
 	FReply OnClicked();
-
-	/** Delegate called when the source control window is closed */
-	void OnSourceControlDialogClosed(const TSharedRef<class SWindow>& InWindow);
-
-private:
-	// TODO even more POC from FSourceControlModule
-
-	/** The login window we may be using */
-	TSharedPtr<SWindow> PlasticSourceControlBranchesWindowPtr;
-
-	/** The login window control we may be using */
-	TSharedPtr<class SPlasticSourceControlBranches> PlasticSourceControlBranchesContentPtr;
 };
 
 #endif

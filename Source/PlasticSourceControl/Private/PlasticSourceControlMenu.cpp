@@ -154,19 +154,21 @@ void FPlasticSourceControlMenu::ExtendRevisionControlMenu()
 			//   - delete?
 			//   - rename?
 			// TODO add "Create branch"
-			UnityVersionControlSection.AddSubMenu(
-				TEXT("PlasticBranchesSubMenu"),
-				LOCTEXT("PlasticBranchesSubMenu", "Branches"),
-				FText::GetEmpty(),
-				FNewMenuDelegate::CreateRaw(this, &FPlasticSourceControlMenu::GeneratePlasticBranchesMenu),
-				false,
+			UnityVersionControlSection.AddMenuEntry(
+				TEXT("PlasticBranchesWindow"),
+				LOCTEXT("PlasticBranchesWindow", "Branches"),
+				LOCTEXT("PlasticBranchesWindowTooltip", "Open the Branches Window."),
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-				FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Branch")
+				FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Branch"),
 #elif ENGINE_MAJOR_VERSION == 5
-				FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch")
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
 #elif ENGINE_MAJOR_VERSION == 4
-				FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch")
+				FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
 #endif
+				FUIAction(
+					FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::OpenBranchesWindow),
+					FCanExecuteAction()
+				)
 			);
 
 			UnityVersionControlSection.AddSeparator("PlasticSeparator");
@@ -671,6 +673,11 @@ void FPlasticSourceControlMenu::VisitLockRulesURLClicked(const FString InOrganiz
 	FPlatformProcess::LaunchURL(*OrganizationLockRulesURL, NULL, NULL);
 }
 
+void FPlasticSourceControlMenu::OpenBranchesWindow() const
+{
+	FPlasticSourceControlModule::Get().GetUnityVersionControlWindow().OpenTab();
+}
+
 // Display an ongoing notification during the whole operation
 void FPlasticSourceControlMenu::DisplayInProgressNotification(const FText& InOperationInProgressString)
 {
@@ -978,27 +985,6 @@ void FPlasticSourceControlMenu::GeneratePlasticAdvancedMenu(FMenuBuilder& MenuBu
 	}
 }
 
-void FPlasticSourceControlMenu::GeneratePlasticBranchesMenu(FMenuBuilder& MenuBuilder)
-{	
-	MenuBuilder.AddMenuEntry(
-		LOCTEXT("CreateBranch", "Create a new branch"),
-		LOCTEXT("CreateBranchTooltip", "Create and optionally switch to a new branch."),
-		FSlateIcon(),
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitSupportURLClicked), // TODO POC
-			FCanExecuteAction()
-		)
-	);
-	MenuBuilder.AddMenuEntry(
-		LOCTEXT("SwitchToBranch", "Switch to an existing branch"),
-		LOCTEXT("SwitchToBranchTooltip", "Submit a support request for Unity Version Control (formerly Plastic SCM)."),
-		FSlateIcon(),
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::VisitSupportURLClicked), // TODO POC
-			FCanExecuteAction()
-		)
-	);
-}
 
 #if ENGINE_MAJOR_VERSION == 4
 TSharedRef<FExtender> FPlasticSourceControlMenu::OnExtendLevelEditorViewMenu(const TSharedRef<FUICommandList> CommandList)
@@ -1062,80 +1048,15 @@ FText SPlasticSourceControlStatusBar::GetStatusBarText() const
 
 FText SPlasticSourceControlStatusBar::GetStatusBarTooltip() const
 {
-	return LOCTEXT("Branches_Tooltip", "Switch to another branch.");
+	return LOCTEXT("Branches_Tooltip", "Open Window to manage branches");
 }
 
 
 FReply SPlasticSourceControlStatusBar::OnClicked()
 {
-	// TODO POC 
-
-	// Create the window
-	PlasticSourceControlBranchesWindowPtr = SNew(SWindow)
-		.Title(LOCTEXT("PlasticBranchesTitle", "Branches"))
-		.HasCloseButton(true)
-		.SupportsMaximize(false)
-		.SupportsMinimize(false)
-		.SizingRule(ESizingRule::Autosized);
-
-	// Set the closed callback
-	PlasticSourceControlBranchesWindowPtr->SetOnWindowClosed(FOnWindowClosed::CreateRaw(this, &SPlasticSourceControlStatusBar::OnSourceControlDialogClosed));
-
-	// Setup the content for the created login window.
-	PlasticSourceControlBranchesWindowPtr->SetContent(
-		SAssignNew(PlasticSourceControlBranchesContentPtr, SPlasticSourceControlBranches)
-	);
-
 	FPlasticSourceControlModule::Get().GetUnityVersionControlWindow().OpenTab();
 
-	/*
-	TSharedPtr<SWindow> RootWindow = FGlobalTabmanager::Get()->GetRootWindow();
-	if (RootWindow.IsValid())
-	{
-		FSlateApplication::Get().AddWindowAsNativeChild(PlasticSourceControlBranchesWindowPtr.ToSharedRef(), RootWindow.ToSharedRef());
-	}
-	else
-	{
-		FSlateApplication::Get().AddWindow(PlasticSourceControlBranchesWindowPtr.ToSharedRef());
-	}
-	*/
 	return FReply::Handled();
-}
-
-void SPlasticSourceControlStatusBar::OnSourceControlDialogClosed(const TSharedRef<class SWindow>& InWindow)
-{
-	PlasticSourceControlBranchesWindowPtr = NULL;
-	PlasticSourceControlBranchesContentPtr = NULL;
-}
-
-
-// TODO POC : on clic display popup to select branch from a list using filters
-
-// Let's perhaps take inspiration from
-// /** Panel designed to display the revision history of a package */
-// class SSourceControlHistoryWidget : public SCompoundWidget
-
-
-void SPlasticSourceControlBranches::Construct(const FArguments& InArgs)
-{
-	ChildSlot
-	[
-		SNew(SVerticalBox)
-		+SVerticalBox::Slot()
-		.AutoHeight()
-		.Padding(2.0f)
-		.VAlign(VAlign_Center)
-		[
-			SNew(SHorizontalBox)
-			.ToolTipText(LOCTEXT("PlasticBranches_Tooltip", "List of branches in the repository"))
-			+SHorizontalBox::Slot()
-			.FillWidth(1.0f)
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("PlasticBranchesTitle", "Branches"))
-			]
-		]
-	];
 }
 
 #undef LOCTEXT_NAMESPACE

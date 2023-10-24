@@ -12,6 +12,10 @@ static const FName UnityVersionControlWindowTabName("UnityVersionControlWindow")
 
 #define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
 
+// POC context menu
+const FName DerivedDataCacheStatisticsContextMenu = TEXT("DerivedDataCacheStatistics.ContextMenu");
+
+
 void FUnityVersionControlWindow::Register()
 {
 	FUnityVersionControlStyle::Initialize();
@@ -30,17 +34,12 @@ void FUnityVersionControlWindow::Unregister()
 	FUnityVersionControlStyle::Shutdown();
 }
 
-TSharedPtr<SWidget> FUnityVersionControlWindow::CreateCacheStatisticsDialog()
-{
-	return SNew(SDerivedDataCacheStatisticsDialog);
-}
-
 TSharedRef<SDockTab> FUnityVersionControlWindow::OnSpawnTab(const FSpawnTabArgs& SpawnTabArgs)
 {
 	return SNew(SDockTab)
 		.TabRole(ETabRole::NomadTab)
 		[
-			CreateCacheStatisticsDialog().ToSharedRef()
+			CreateCacheBranchesWidget().ToSharedRef()
 		];
 }
 
@@ -49,23 +48,19 @@ void FUnityVersionControlWindow::OpenTab()
 	FGlobalTabmanager::Get()->TryInvokeTab(UnityVersionControlWindowTabName);
 }
 
-
-// TODO POC
-static TSharedPtr<SDerivedDataCacheStatisticsDialog> PinnedHistoryWidget;
-
-// POC context menu
-const FName DerivedDataCacheStatisticsContextMenu = TEXT("DerivedDataCacheStatistics.ContextMenu");
-
-void SDerivedDataCacheStatisticsDialog::Construct(const FArguments& InArgs)
+TSharedPtr<SWidget> FUnityVersionControlWindow::CreateCacheBranchesWidget()
 {
-	PinnedHistoryWidget = SharedThis(this);
+	return SNew(SBranchesWidget);
+}
 
+void SBranchesWidget::Construct(const FArguments& InArgs)
+{
 	if (!UToolMenus::Get()->IsMenuRegistered(DerivedDataCacheStatisticsContextMenu))
 	{
 		UToolMenu* ContextMenu = UToolMenus::Get()->RegisterMenu(DerivedDataCacheStatisticsContextMenu);
 		ContextMenu->bShouldCloseWindowAfterMenuSelection = true;
 
-		ContextMenu->AddDynamicSection(NAME_None, FNewToolMenuDelegate::CreateStatic(&SDerivedDataCacheStatisticsDialog::CreateDiffMenu));
+		ContextMenu->AddDynamicSection(NAME_None, FNewToolMenuDelegate::CreateStatic(&SBranchesWidget::CreatePOCMenu));
 	}
 
 	const float RowMargin = 0.0f;
@@ -88,8 +83,8 @@ void SDerivedDataCacheStatisticsDialog::Construct(const FArguments& InArgs)
 				SNew(SEditableTextBox)
 				.Justification(ETextJustify::Left)
 				.HintText(LOCTEXT("Filter", "Filter"))
-				.OnTextChanged(this, &SDerivedDataCacheStatisticsDialog::OnFilterTextChanged)
-				.OnContextMenuOpening(this, &SDerivedDataCacheStatisticsDialog::OnCreateContextMenu)
+				.OnTextChanged(this, &SBranchesWidget::OnFilterTextChanged)
+				.OnContextMenuOpening(this, &SBranchesWidget::OnCreateContextMenu)
 			]
 		]
 		+ SVerticalBox::Slot()
@@ -101,10 +96,10 @@ void SDerivedDataCacheStatisticsDialog::Construct(const FArguments& InArgs)
 		]
 	];
 
-	RegisterActiveTimer(60.f, FWidgetActiveTimerDelegate::CreateSP(this, &SDerivedDataCacheStatisticsDialog::UpdateGridPanels));
+	RegisterActiveTimer(60.f, FWidgetActiveTimerDelegate::CreateSP(this, &SBranchesWidget::UpdateGridPanels));
 }
 
-void SDerivedDataCacheStatisticsDialog::OnFilterTextChanged(const FText& SearchText)
+void SBranchesWidget::OnFilterTextChanged(const FText& SearchText)
 {
 	FilterText = SearchText.ToString();
 
@@ -112,7 +107,7 @@ void SDerivedDataCacheStatisticsDialog::OnFilterTextChanged(const FText& SearchT
 }
 
 
-EActiveTimerReturnType SDerivedDataCacheStatisticsDialog::UpdateGridPanels(double InCurrentTime, float InDeltaTime)
+EActiveTimerReturnType SBranchesWidget::UpdateGridPanels(double InCurrentTime, float InDeltaTime)
 {
 	(*GridSlot)
 	[
@@ -124,7 +119,7 @@ EActiveTimerReturnType SDerivedDataCacheStatisticsDialog::UpdateGridPanels(doubl
 	return EActiveTimerReturnType::Continue;
 }
 
-TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
+TSharedRef<SWidget> SBranchesWidget::GetGridPanel()
 {
 	TSharedRef<SGridPanel> Panel =
 		SNew(SGridPanel);
@@ -241,10 +236,16 @@ TSharedRef<SWidget> SDerivedDataCacheStatisticsDialog::GetGridPanel()
 	return Panel;
 }
 
-void SDerivedDataCacheStatisticsDialog::CreateDiffMenu(UToolMenu* InToolMenu)
+void SBranchesWidget::CreatePOCMenu(UToolMenu* InToolMenu)
 {
+	UBranchesWidgetContext* FoundContext = InToolMenu->FindContext<UBranchesWidgetContext>();
+	if (!FoundContext)
+	{
+		return;
+	}
 
-	if (!PinnedHistoryWidget)
+	TSharedPtr<SBranchesWidget> BranchesWidget = FoundContext->BranchesWidget.Pin();
+	if (!BranchesWidget)
 	{
 		return;
 	}
@@ -256,7 +257,7 @@ void SDerivedDataCacheStatisticsDialog::CreateDiffMenu(UToolMenu* InToolMenu)
 		LOCTEXT("CreateChildBranchTooltip", "Create child branch."),
 		FSlateIcon(),
 		FUIAction(
-			FExecuteAction::CreateSP(PinnedHistoryWidget.Get(), &SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev)
+			FExecuteAction::CreateSP(BranchesWidget.Get(), &SBranchesWidget::OnPOCMenuAction)
 		)
 	);
 	Section.AddMenuEntry(
@@ -265,7 +266,7 @@ void SDerivedDataCacheStatisticsDialog::CreateDiffMenu(UToolMenu* InToolMenu)
 		LOCTEXT("SwitchToTooltip", "Switch workspace to this branch."),
 		FSlateIcon(),
 		FUIAction(
-			FExecuteAction::CreateSP(PinnedHistoryWidget.Get(), &SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev)
+			FExecuteAction::CreateSP(BranchesWidget.Get(), &SBranchesWidget::OnPOCMenuAction)
 		)
 	);
 
@@ -277,7 +278,7 @@ void SDerivedDataCacheStatisticsDialog::CreateDiffMenu(UToolMenu* InToolMenu)
 		LOCTEXT("RenameBranchTooltip", "Rename branch."),
 		FSlateIcon(),
 		FUIAction(
-			FExecuteAction::CreateSP(PinnedHistoryWidget.Get(), &SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev)
+			FExecuteAction::CreateSP(BranchesWidget.Get(), &SBranchesWidget::OnPOCMenuAction)
 		)
 	);
 	Section.AddMenuEntry(
@@ -286,19 +287,24 @@ void SDerivedDataCacheStatisticsDialog::CreateDiffMenu(UToolMenu* InToolMenu)
 		LOCTEXT("DeleteBranchTooltip", "Delete branch."),
 		FSlateIcon(),
 		FUIAction(
-			FExecuteAction::CreateSP(PinnedHistoryWidget.Get(), &SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev)
+			FExecuteAction::CreateSP(BranchesWidget.Get(), &SBranchesWidget::OnPOCMenuAction)
 		)
 	);
 
 }
 
-void SDerivedDataCacheStatisticsDialog::OnDiffAgainstPreviousRev()
+void SBranchesWidget::OnPOCMenuAction()
 {
 }
 
-TSharedPtr<SWidget> SDerivedDataCacheStatisticsDialog::OnCreateContextMenu()
+TSharedPtr<SWidget> SBranchesWidget::OnCreateContextMenu()
 {
+	// Provide the Menu with a Context to reference the current widget
 	FToolMenuContext Context;
+	UBranchesWidgetContext* BranchesWidgetContext = NewObject<UBranchesWidgetContext>();
+	BranchesWidgetContext->BranchesWidget = SharedThis(this);
+	Context.AddObject(BranchesWidgetContext);
+
 	if (UToolMenu* GeneratedContextMenu = UToolMenus::Get()->GenerateMenu(DerivedDataCacheStatisticsContextMenu, Context))
 	{
 		return UToolMenus::Get()->GenerateWidget(GeneratedContextMenu);

@@ -49,6 +49,7 @@ private:
 
 
 // TODO POC
+// NOTE: inspired from SUnsavedAssetsStatusBarWidget
 class SBranchesWidget : public SCompoundWidget
 {
 	SLATE_BEGIN_ARGS(SBranchesWidget) {}
@@ -87,12 +88,37 @@ private:
 class SCreateBranch : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SCreateBranch) {}
+	SLATE_BEGIN_ARGS(SCreateBranch)
+		: _ParentWindow()
+		, _BranchName()
+	{}
+
+		SLATE_ATTRIBUTE(TSharedPtr<SWindow>, ParentWindow)
+		SLATE_ATTRIBUTE(FString, BranchName)
+
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
 
+	void OnCheckedSwitchWorkspace(ECheckBoxState InCheckedState);
+
+	/** Called when the settings of the dialog are to be accepted */
+	FReply CreateClicked();
+
+	/** Called when the settings of the dialog are to be ignored */
+	FReply CancelClicked();
+
+	TSharedPtr<class SEditableTextBox> BranchNameTextCtrl;
+	TSharedPtr<class SMultiLineEditableTextBox> BranchCommentsTextCtrl;
+	TSharedPtr<class SCheckBox> SwitchWorkspaceCheckBoxCtrl;
+
 private:
+
+	/** Pointer to the parent modal window */
+	TWeakPtr<SWindow> ParentWindow;
+	FString BranchName;
+
+	bool bSwitchWorkspace = true;
 
 };
 

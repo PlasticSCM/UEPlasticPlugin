@@ -148,29 +148,6 @@ void FPlasticSourceControlMenu::ExtendRevisionControlMenu()
 #endif
 			);
 
-			// TODO add "Recent branches" as a submenu?
-			// can we fit a full submenu on each of these branches? Is it even a good UI/UX practice (I doubt it)
-			//   - switch to?
-			//   - delete?
-			//   - rename?
-			// TODO add "Create branch"
-			UnityVersionControlSection.AddMenuEntry(
-				TEXT("PlasticBranchesWindow"),
-				LOCTEXT("PlasticBranchesWindow", "Branches"),
-				LOCTEXT("PlasticBranchesWindowTooltip", "Open the Branches Window."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-				FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Branch"),
-#elif ENGINE_MAJOR_VERSION == 5
-				FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
-#elif ENGINE_MAJOR_VERSION == 4
-				FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
-#endif
-				FUIAction(
-					FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::OpenBranchesWindow),
-					FCanExecuteAction()
-				)
-			);
-
 			UnityVersionControlSection.AddSeparator("PlasticSeparator");
 
 			// TODO POC REVIEW at the end of the Unity Version Control section so it's close to the original Source Control Actions
@@ -843,6 +820,32 @@ void FPlasticSourceControlMenu::AddMenuActions(FToolMenuSection& Menu)
 #endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::RefreshClicked),
+			FCanExecuteAction()
+		)
+	);
+
+
+	// TODO add "Recent branches" as a submenu?
+	// can we fit a full submenu on each of these branches? Is it even a good UI/UX practice (I doubt it)
+	//   - switch to?
+	//   - delete?
+	//   - rename?
+	// TODO add "Create branch"
+	Menu.AddMenuEntry(
+#if ENGINE_MAJOR_VERSION == 5
+		TEXT("PlasticBranchesWindow"),
+#endif
+		LOCTEXT("PlasticBranchesWindow", "Show Branches"),
+		LOCTEXT("PlasticBranchesWindowTooltip", "Open the Branches Window."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Branch"),
+#elif ENGINE_MAJOR_VERSION == 5
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
+#elif ENGINE_MAJOR_VERSION == 4
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
+#endif
+		FUIAction(
+			FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::OpenBranchesWindow),
 			FCanExecuteAction()
 		)
 	);

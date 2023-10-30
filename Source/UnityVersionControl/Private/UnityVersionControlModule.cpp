@@ -3,8 +3,11 @@
 #include "UnityVersionControlModule.h"
 
 #include "IUnityVersionControlWorker.h"
+
+#include "Interfaces/IPluginManager.h"
 #include "Features/IModularFeatures.h"
 #include "Misc/App.h"
+#include "Modules/ModuleManager.h"
 
 #define LOCTEXT_NAMESPACE "UnityVersionControl"
 
@@ -24,6 +27,21 @@ void FUnityVersionControlModule::ShutdownModule()
 
 	// unbind provider from editor
 	IModularFeatures::Get().UnregisterModularFeature("SourceControl", &UnityVersionControlProvider);
+}
+
+FUnityVersionControlModule& FUnityVersionControlModule::Get()
+{
+	return FModuleManager::GetModuleChecked<FUnityVersionControlModule>("UnityVersionControl");
+}
+
+bool FUnityVersionControlModule::IsLoaded()
+{
+	return FModuleManager::Get().IsModuleLoaded("UnityVersionControl");
+}
+
+const TSharedPtr<IPlugin> FUnityVersionControlModule::GetPlugin()
+{
+	return IPluginManager::Get().FindPlugin(TEXT("UnityVersionControl"));;
 }
 
 IMPLEMENT_MODULE(FUnityVersionControlModule, UnityVersionControl);

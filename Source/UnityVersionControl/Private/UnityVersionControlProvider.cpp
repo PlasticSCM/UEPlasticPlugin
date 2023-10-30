@@ -4,6 +4,7 @@
 
 #include "UnityVersionControlChangelistState.h"
 #include "UnityVersionControlCommand.h"
+#include "UnityVersionControlModule.h"
 #include "UnityVersionControlOperations.h"
 #include "UnityVersionControlProjectSettings.h"
 #include "UnityVersionControlSettings.h"
@@ -58,7 +59,7 @@ void FUnityVersionControlProvider::Init(bool bForceConnection)
 	// Init() is called multiple times at startup: do not check Unity Version Control each time
 	if (!bPlasticAvailable)
 	{
-		const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("UnityVersionControl"));
+		const TSharedPtr<IPlugin> Plugin = FUnityVersionControlModule::GetPlugin();
 		if (Plugin.IsValid())
 		{
 			PluginVersion = Plugin->GetDescriptor().VersionName;

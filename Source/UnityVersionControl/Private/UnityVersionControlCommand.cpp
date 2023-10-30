@@ -1,11 +1,11 @@
 // Copyright (c) 2023 Unity Technologies
 
 #include "UnityVersionControlCommand.h"
-#include "UnityVersionControlModule.h"
-#include "ISourceControlOperation.h"
-#include "Modules/ModuleManager.h"
-#include "HAL/PlatformTime.h"
 
+#include "UnityVersionControlModule.h"
+
+#include "ISourceControlOperation.h"
+#include "HAL/PlatformTime.h"
 
 FUnityVersionControlCommand::FUnityVersionControlCommand(const FSourceControlOperationRef& InOperation, const FUnityVersionControlWorkerRef& InWorker, const FSourceControlOperationComplete& InOperationCompleteDelegate)
 	: Operation(InOperation)

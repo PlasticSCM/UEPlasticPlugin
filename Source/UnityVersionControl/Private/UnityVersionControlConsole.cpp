@@ -2,9 +2,9 @@
 
 #include "UnityVersionControlConsole.h"
 
-#include "ISourceControlModule.h"
-
 #include "UnityVersionControlUtils.h"
+
+#include "ISourceControlModule.h"
 
 void FUnityVersionControlConsole::Register()
 {

@@ -12,6 +12,7 @@
 
 #include "ContentBrowserMenuContexts.h"
 #include "Interfaces/IPluginManager.h"
+#include "Modules/ModuleManager.h"
 #include "LevelEditor.h"
 #include "Widgets/Notifications/SNotificationList.h"
 #include "Framework/Notifications/NotificationManager.h"
@@ -540,7 +541,7 @@ void FUnityVersionControlMenu::ShowSourceControlPlasticScmProjectSettings() cons
 void FUnityVersionControlMenu::VisitDocsURLClicked() const
 {
 	// Grab the URL from the uplugin file
-	const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("UnityVersionControl"));
+	const TSharedPtr<IPlugin> Plugin = FUnityVersionControlModule::GetPlugin();
 	if (Plugin.IsValid())
 	{
 		FPlatformProcess::LaunchURL(*Plugin->GetDescriptor().DocsURL, NULL, NULL);
@@ -550,7 +551,7 @@ void FUnityVersionControlMenu::VisitDocsURLClicked() const
 void FUnityVersionControlMenu::VisitSupportURLClicked() const
 {
 	// Grab the URL from the uplugin file
-	const TSharedPtr<IPlugin> Plugin = IPluginManager::Get().FindPlugin(TEXT("UnityVersionControl"));
+	const TSharedPtr<IPlugin> Plugin = FUnityVersionControlModule::GetPlugin();
 	if (Plugin.IsValid())
 	{
 		FPlatformProcess::LaunchURL(*Plugin->GetDescriptor().SupportURL, NULL, NULL);

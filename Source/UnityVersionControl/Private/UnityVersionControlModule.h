@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleInterface.h"
-#include "Modules/ModuleManager.h"
+
 #include "UnityVersionControlProvider.h"
 #include "UnityVersionControlWorkspaceCreation.h"
 
@@ -42,18 +42,19 @@ public:
 	 *
 	 * @return Returns singleton instance, asserts if the module is not loaded yet or unloaded already.
 	 */
-	static inline FUnityVersionControlModule& Get()
-	{
-		return FModuleManager::GetModuleChecked<FUnityVersionControlModule>("UnityVersionControl");
-	}
+	static FUnityVersionControlModule& Get();
 
 	/**
 	 * Checks whether the module is currently loaded.
 	 */
-	static inline bool IsLoaded()
-	{
-		return FModuleManager::Get().IsModuleLoaded("UnityVersionControl");
-	}
+	static bool IsLoaded();
+
+	/**
+	 * Finds information of the plugin.
+	 *
+	 * @return	 Pointer to the plugin's information, or nullptr.
+	 */
+	static const TSharedPtr<class IPlugin> GetPlugin();
 
 private:
 	/** The Plastic source control provider */

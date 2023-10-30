@@ -5,6 +5,7 @@
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlProvider.h"
 #include "UnityVersionControlOperations.h"
+#include "SUnityVersionControlStatusBar.h"
 
 #include "ISourceControlModule.h"
 #include "ISourceControlOperation.h"
@@ -37,6 +38,7 @@
 
 FName FUnityVersionControlMenu::UnityVersionControlMainMenuOwnerName = TEXT("UnityVersionControlMenu");
 FName FUnityVersionControlMenu::UnityVersionControlAssetContextLocksMenuOwnerName = TEXT("UnityVersionControlContextLocksMenu");
+FName FUnityVersionControlMenu::UnityVersionControlStatusBarMenuOwnerName = TEXT("UnityVersionControlStatusBarMenu");
 
 void FUnityVersionControlMenu::Register()
 {
@@ -48,6 +50,8 @@ void FUnityVersionControlMenu::Register()
 	// Register the menu extensions with the level editor
 	ExtendRevisionControlMenu();
 	ExtendAssetContextMenu();
+
+	ExtendToolbarWithStatusBarWidget();
 }
 
 void FUnityVersionControlMenu::Unregister()
@@ -73,11 +77,25 @@ void FUnityVersionControlMenu::Unregister()
 	{
 		ToolMenus->UnregisterOwnerByName(UnityVersionControlMainMenuOwnerName);
 		ToolMenus->UnregisterOwnerByName(UnityVersionControlAssetContextLocksMenuOwnerName);
+		ToolMenus->UnregisterOwnerByName(UnityVersionControlStatusBarMenuOwnerName);
 		bHasRegistered = false;
 	}
 #endif
 }
 
+void FUnityVersionControlMenu::ExtendToolbarWithStatusBarWidget()
+{
+#if ENGINE_MAJOR_VERSION == 5
+	const FToolMenuOwnerScoped SourceControlMenuOwner(UnityVersionControlStatusBarMenuOwnerName);
+
+	UToolMenu* ToolbarMenu = UToolMenus::Get()->ExtendMenu("LevelEditor.StatusBar.ToolBar");
+	FToolMenuSection& Section = ToolbarMenu->AddSection("Unity Version Control", FText::GetEmpty(), FToolMenuInsert("SourceControl", EToolMenuInsertType::Before));
+
+	Section.AddEntry(
+		FToolMenuEntry::InitWidget("UnityVersionControlStatusBar", SNew(SUnityVersionControlStatusBar), FText::GetEmpty(), true, false)
+	);
+#endif
+}
 
 void FUnityVersionControlMenu::ExtendRevisionControlMenu()
 {

@@ -7,6 +7,7 @@
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlProvider.h"
 #include "UnityVersionControlSettings.h"
+#include "UnityVersionControlShell.h"
 #include "UnityVersionControlState.h"
 #include "UnityVersionControlUtils.h"
 #include "UnityVersionControlVersions.h"
@@ -171,11 +172,12 @@ bool FPlasticConnectWorker::Execute(FUnityVersionControlCommand& InCommand)
 				// Now update the status of assets in the Content directory
 				// but only on real (re-)connection (but not each time Login() is called by Rename or Fixup Redirector command to check connection)
 				// and only if enabled in the settings
-				if (!GetProvider().IsAvailable() && GetProvider().AccessSettings().GetUpdateStatusAtStartup())
+				if (!UnityVersionControlShell::GetShellIsWarmedUp() && GetProvider().AccessSettings().GetUpdateStatusAtStartup())
 				{
+					UnityVersionControlShell::SetShellIsWarmedUp();
 					TArray<FString> ContentDir;
 					ContentDir.Add(FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()));
-					UnityVersionControlUtils::RunUpdateStatus(ContentDir, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
+					UnityVersionControlUtils::RunUpdateStatus(ContentDir, UnityVersionControlUtils::EStatusSearchType::All, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 				}
 			}
 			else

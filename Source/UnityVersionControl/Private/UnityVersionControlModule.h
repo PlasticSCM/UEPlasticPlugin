@@ -8,6 +8,8 @@
 #include "UnityVersionControlProvider.h"
 #include "UnityVersionControlWorkspaceCreation.h"
 
+#include "UnityVersionControlBranchesWindow.h"
+
 /**
  * UnityVersionControl is the official Unity Version Control Plugin for Unreal Engine
  *
@@ -36,6 +38,11 @@ public:
 		return UnityVersionControlWorkspaceCreation;
 	}
 
+	FUnityVersionControlBranchesWindow& GetBranchesWindow()
+	{
+		return UnityVersionControlBranchesWindow;
+	}
+
 	/**
 	 * Singleton-like access to this module's interface.  This is just for convenience!
 	 * Beware of calling this during the shutdown phase, though.  Your module might have been unloaded already.
@@ -59,6 +66,8 @@ public:
 private:
 	/** The Plastic source control provider */
 	FUnityVersionControlProvider UnityVersionControlProvider;
+
+	FUnityVersionControlBranchesWindow UnityVersionControlBranchesWindow;
 
 	/** Logic to create a new workspace */
 	FUnityVersionControlWorkspaceCreation UnityVersionControlWorkspaceCreation;

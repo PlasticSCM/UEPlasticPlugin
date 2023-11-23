@@ -2,6 +2,7 @@
 
 #include "UnityVersionControlMenu.h"
 
+#include "UnityVersionControlBranchesWindow.h"
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlProvider.h"
 #include "UnityVersionControlOperations.h"
@@ -15,8 +16,6 @@
 #include "Interfaces/IPluginManager.h"
 #include "Modules/ModuleManager.h"
 #include "LevelEditor.h"
-#include "Widgets/Notifications/SNotificationList.h"
-#include "Framework/Notifications/NotificationManager.h"
 #include "Misc/MessageDialog.h"
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
@@ -25,7 +24,6 @@
 #endif
 
 #include "PackageUtils.h"
-#include "FileHelpers.h"
 #include "ISettingsModule.h"
 
 #include "Logging/MessageLog.h"
@@ -111,15 +109,21 @@ void FUnityVersionControlMenu::ExtendRevisionControlMenu()
 	}
 #elif ENGINE_MAJOR_VERSION == 5
 	const FToolMenuOwnerScoped SourceControlMenuOwner(UnityVersionControlMainMenuOwnerName);
-	if (UToolMenus* ToolMenus = UToolMenus::Get())
+
+	if (UToolMenu* SourceControlMenu = UToolMenus::Get()->ExtendMenu("StatusBar.ToolBar.SourceControl"))
 	{
-		if (UToolMenu* SourceControlMenu = ToolMenus->ExtendMenu("StatusBar.ToolBar.SourceControl"))
+		FToolMenuSection& Section = SourceControlMenu->AddSection("UnityVersionControlActions", LOCTEXT("UnityVersionControlMenuHeadingActions", "Unity Version Control"), FToolMenuInsert(NAME_None, EToolMenuInsertType::First));
+
+		AddMenuExtension(Section);
+
+		bHasRegistered = true;
+	}
+
+	if (UToolMenu* ToolsMenu = UToolMenus::Get()->ExtendMenu("MainFrame.MainMenu.Tools"))
+	{
+		if (FToolMenuSection* Section = ToolsMenu->FindSection("Source Control"))
 		{
-			FToolMenuSection& Section = SourceControlMenu->AddSection("UnityVersionControlActions", LOCTEXT("UnityVersionControlMenuHeadingActions", "Unity Version Control"), FToolMenuInsert(NAME_None, EToolMenuInsertType::First));
-
-			AddMenuExtension(Section);
-
-			bHasRegistered = true;
+			AddViewBranches(*Section);
 		}
 	}
 #endif
@@ -284,7 +288,7 @@ void FUnityVersionControlMenu::ExecuteRemoveLocks(TArray<FAssetData> InAssetObje
 
 void FUnityVersionControlMenu::ExecuteUnlock(const TArray<FAssetData>& InAssetObjectPaths, const bool bInRemove)
 {
-	if (!OperationInProgressNotification.IsValid())
+	if (!Notification.IsInProgress())
 	{
 		const TArray<FString> Files = PackageUtils::AssetDateToFileNames(InAssetObjectPaths);
 
@@ -296,12 +300,12 @@ void FUnityVersionControlMenu::ExecuteUnlock(const TArray<FAssetData>& InAssetOb
 		if (Result == ECommandResult::Succeeded)
 		{
 			// Display an ongoing notification during the whole operation (packages will be reloaded at the completion of the operation)
-			DisplayInProgressNotification(UnlockOperation->GetInProgressString());
+			Notification.DisplayInProgress(UnlockOperation->GetInProgressString());
 		}
 		else
 		{
 			// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
-			DisplayFailureNotification(UnlockOperation->GetName());
+			FNotification::DisplayFailure(UnlockOperation->GetName());
 		}
 	}
 	else
@@ -318,48 +322,15 @@ bool FUnityVersionControlMenu::IsSourceControlConnected() const
 	return Provider.IsEnabled() && Provider.IsAvailable();
 }
 
-/// Prompt to save or discard all packages
-bool FUnityVersionControlMenu::SaveDirtyPackages()
-{
-	const bool bPromptUserToSave = true;
-	const bool bSaveMapPackages = true;
-	const bool bSaveContentPackages = true;
-	const bool bFastSave = false;
-	const bool bNotifyNoPackagesSaved = false;
-	const bool bCanBeDeclined = true; // If the user clicks "don't save" this will continue and lose their changes
-	bool bHadPackagesToSave = false;
-
-	bool bSaved = FEditorFileUtils::SaveDirtyPackages(bPromptUserToSave, bSaveMapPackages, bSaveContentPackages, bFastSave, bNotifyNoPackagesSaved, bCanBeDeclined, &bHadPackagesToSave);
-
-	// bSaved can be true if the user selects to not save an asset by un-checking it and clicking "save"
-	if (bSaved)
-	{
-		TArray<UPackage*> DirtyPackages;
-		FEditorFileUtils::GetDirtyWorldPackages(DirtyPackages);
-		FEditorFileUtils::GetDirtyContentPackages(DirtyPackages);
-		bSaved = DirtyPackages.Num() == 0;
-	}
-
-	return bSaved;
-}
-
-/// Find all packages in Content directory
-TArray<FString> FUnityVersionControlMenu::ListAllPackages()
-{
-	TArray<FString> PackageFilePaths;
-	FPackageName::FindPackagesInDirectory(PackageFilePaths, FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()));
-	return PackageFilePaths;
-}
-
 void FUnityVersionControlMenu::SyncProjectClicked()
 {
-	if (!OperationInProgressNotification.IsValid())
+	if (!Notification.IsInProgress())
 	{
-		const bool bSaved = SaveDirtyPackages();
+		const bool bSaved = PackageUtils::SaveDirtyPackages();
 		if (bSaved)
 		{
 			// Find and Unlink all loaded packages in Content directory to allow to update them
-			PackageUtils::UnlinkPackages(ListAllPackages());
+			PackageUtils::UnlinkPackages(PackageUtils::ListAllPackages());
 
 			// Launch a custom "SyncAll" operation
 			FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
@@ -368,12 +339,12 @@ void FUnityVersionControlMenu::SyncProjectClicked()
 			if (Result == ECommandResult::Succeeded)
 			{
 				// Display an ongoing notification during the whole operation (packages will be reloaded at the completion of the operation)
-				DisplayInProgressNotification(SyncOperation->GetInProgressString());
+				Notification.DisplayInProgress(SyncOperation->GetInProgressString());
 			}
 			else
 			{
 				// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
-				DisplayFailureNotification(SyncOperation->GetName());
+				FNotification::DisplayFailure(SyncOperation->GetName());
 			}
 		}
 		else
@@ -393,7 +364,7 @@ void FUnityVersionControlMenu::SyncProjectClicked()
 
 void FUnityVersionControlMenu::RevertUnchangedClicked()
 {
-	if (!OperationInProgressNotification.IsValid())
+	if (!Notification.IsInProgress())
 	{
 		// Launch a "RevertUnchanged" Operation
 		FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
@@ -402,12 +373,12 @@ void FUnityVersionControlMenu::RevertUnchangedClicked()
 		if (Result == ECommandResult::Succeeded)
 		{
 			// Display an ongoing notification during the whole operation
-			DisplayInProgressNotification(RevertUnchangedOperation->GetInProgressString());
+			Notification.DisplayInProgress(RevertUnchangedOperation->GetInProgressString());
 		}
 		else
 		{
 			// Report failure with a notification
-			DisplayFailureNotification(RevertUnchangedOperation->GetName());
+			FNotification::DisplayFailure(RevertUnchangedOperation->GetName());
 		}
 	}
 	else
@@ -420,18 +391,18 @@ void FUnityVersionControlMenu::RevertUnchangedClicked()
 
 void FUnityVersionControlMenu::RevertAllClicked()
 {
-	if (!OperationInProgressNotification.IsValid())
+	if (!Notification.IsInProgress())
 	{
 		// Ask the user before reverting all!
 		const FText DialogText(LOCTEXT("SourceControlMenu_AskRevertAll", "Revert all modifications into the workspace?"));
 		const EAppReturnType::Type Choice = FMessageDialog::Open(EAppMsgType::OkCancel, DialogText);
 		if (Choice == EAppReturnType::Ok)
 		{
-			const bool bSaved = SaveDirtyPackages();
+			const bool bSaved = PackageUtils::SaveDirtyPackages();
 			if (bSaved)
 			{
 				// Find and Unlink all packages in Content directory to allow to update them
-				PackageUtils::UnlinkPackages(ListAllPackages());
+				PackageUtils::UnlinkPackages(PackageUtils::ListAllPackages());
 
 				// Launch a "RevertAll" Operation
 				FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
@@ -440,12 +411,12 @@ void FUnityVersionControlMenu::RevertAllClicked()
 				if (Result == ECommandResult::Succeeded)
 				{
 					// Display an ongoing notification during the whole operation
-					DisplayInProgressNotification(RevertAllOperation->GetInProgressString());
+					Notification.DisplayInProgress(RevertAllOperation->GetInProgressString());
 				}
 				else
 				{
 					// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
-					DisplayFailureNotification(RevertAllOperation->GetName());
+					FNotification::DisplayFailure(RevertAllOperation->GetName());
 				}
 			}
 			else
@@ -464,38 +435,9 @@ void FUnityVersionControlMenu::RevertAllClicked()
 	}
 }
 
-void FUnityVersionControlMenu::RefreshClicked()
-{
-	if (!OperationInProgressNotification.IsValid())
-	{
-		// Launch an "UpdateStatus" Operation
-		FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-		TSharedRef<FUpdateStatus, ESPMode::ThreadSafe> RefreshOperation = ISourceControlOperation::Create<FUpdateStatus>();
-		// This is the flag used by the Content Browser's "Checkout" filter to trigger a full status update
-		RefreshOperation->SetGetOpenedOnly(true);
-		const ECommandResult::Type Result = Provider.Execute(RefreshOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlMenu::OnSourceControlOperationComplete));
-		if (Result == ECommandResult::Succeeded)
-		{
-			// Display an ongoing notification during the whole operation
-			DisplayInProgressNotification(RefreshOperation->GetInProgressString());
-		}
-		else
-		{
-			// Report failure with a notification
-			DisplayFailureNotification(RefreshOperation->GetName());
-		}
-	}
-	else
-	{
-		FMessageLog SourceControlLog("SourceControl");
-		SourceControlLog.Warning(LOCTEXT("SourceControlMenu_InProgress", "Source control operation already in progress"));
-		SourceControlLog.Notify();
-	}
-}
-
 void FUnityVersionControlMenu::SwitchToPartialWorkspaceClicked()
 {
-	if (!OperationInProgressNotification.IsValid())
+	if (!Notification.IsInProgress())
 	{
 		// Ask the user before switching to Partial Workspace. It's not possible to switch back with local changes!
 		const FText DialogText(LOCTEXT("SourceControlMenu_AskSwitchToPartialWorkspace", "Switch to Gluon partial workspace?\n"
@@ -510,12 +452,12 @@ void FUnityVersionControlMenu::SwitchToPartialWorkspaceClicked()
 			if (Result == ECommandResult::Succeeded)
 			{
 				// Display an ongoing notification during the whole operation
-				DisplayInProgressNotification(SwitchOperation->GetInProgressString());
+				Notification.DisplayInProgress(SwitchOperation->GetInProgressString());
 			}
 			else
 			{
 				// Report failure with a notification
-				DisplayFailureNotification(SwitchOperation->GetName());
+				FNotification::DisplayFailure(SwitchOperation->GetName());
 			}
 		}
 	}
@@ -585,62 +527,9 @@ void FUnityVersionControlMenu::VisitLockRulesURLClicked(const FString InOrganiza
 	FPlatformProcess::LaunchURL(*OrganizationLockRulesURL, NULL, NULL);
 }
 
-// Display an ongoing notification during the whole operation
-void FUnityVersionControlMenu::DisplayInProgressNotification(const FText& InOperationInProgressString)
+void FUnityVersionControlMenu::OpenBranchesWindow() const
 {
-	if (!OperationInProgressNotification.IsValid())
-	{
-		FNotificationInfo Info(InOperationInProgressString);
-		Info.bFireAndForget = false;
-		Info.ExpireDuration = 0.0f;
-		Info.FadeOutDuration = 1.0f;
-		OperationInProgressNotification = FSlateNotificationManager::Get().AddNotification(Info);
-		if (OperationInProgressNotification.IsValid())
-		{
-			OperationInProgressNotification.Pin()->SetCompletionState(SNotificationItem::CS_Pending);
-		}
-	}
-}
-
-// Remove the ongoing notification at the end of the operation
-void FUnityVersionControlMenu::RemoveInProgressNotification()
-{
-	if (OperationInProgressNotification.IsValid())
-	{
-		OperationInProgressNotification.Pin()->ExpireAndFadeout();
-		OperationInProgressNotification.Reset();
-	}
-}
-
-// Display a temporary success notification at the end of the operation
-void FUnityVersionControlMenu::DisplaySucessNotification(const FName& InOperationName)
-{
-	const FText NotificationText = FText::Format(
-		LOCTEXT("SourceControlMenu_Success", "{0} operation was successful!"),
-		FText::FromName(InOperationName)
-	);
-	FNotificationInfo Info(NotificationText);
-	Info.bUseSuccessFailIcons = true;
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-	Info.Image = FAppStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#else
-	Info.Image = FEditorStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#endif
-	FSlateNotificationManager::Get().AddNotification(Info);
-	UE_LOG(LogSourceControl, Verbose, TEXT("%s"), *NotificationText.ToString());
-}
-
-// Display a temporary failure notification at the end of the operation
-void FUnityVersionControlMenu::DisplayFailureNotification(const FName& InOperationName)
-{
-	const FText NotificationText = FText::Format(
-		LOCTEXT("SourceControlMenu_Failure", "Error: {0} operation failed!"),
-		FText::FromName(InOperationName)
-	);
-	FNotificationInfo Info(NotificationText);
-	Info.ExpireDuration = 8.0f;
-	FSlateNotificationManager::Get().AddNotification(Info);
-	UE_LOG(LogSourceControl, Error, TEXT("%s"), *NotificationText.ToString());
+	FUnityVersionControlModule::Get().GetBranchesWindow().OpenTab();
 }
 
 void FUnityVersionControlMenu::OnSyncAllOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult)
@@ -663,16 +552,16 @@ void FUnityVersionControlMenu::OnRevertAllOperationComplete(const FSourceControl
 
 void FUnityVersionControlMenu::OnSourceControlOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult)
 {
-	RemoveInProgressNotification();
+	Notification.RemoveInProgress();
 
 	// Report result with a notification
 	if (InResult == ECommandResult::Succeeded)
 	{
-		DisplaySucessNotification(InOperation->GetName());
+		FNotification::DisplaySuccess(InOperation->GetName());
 	}
 	else
 	{
-		DisplayFailureNotification(InOperation->GetName());
+		FNotification::DisplayFailure(InOperation->GetName());
 	}
 }
 
@@ -729,27 +618,6 @@ void FUnityVersionControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 #endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::RevertAllClicked),
-			FCanExecuteAction()
-		)
-	);
-
-	Menu.AddMenuEntry(
-#if ENGINE_MAJOR_VERSION == 5
-		"PlasticRefresh",
-#endif
-		LOCTEXT("PlasticRefresh",			"Refresh"),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
-		LOCTEXT("PlasticRefreshTooltip",	"Update the local revision control status of all files in the workspace (no expensive checks for locks or changes on other branches)."),
-#else
-		LOCTEXT("PlasticRefreshTooltip",	"Update the local source control status of all files in the workspace (no expensive checks for locks or changes on other branches)."),
-#endif
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Refresh"),
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Refresh"),
-#endif
-		FUIAction(
-			FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::RefreshClicked),
 			FCanExecuteAction()
 		)
 	);
@@ -886,6 +754,34 @@ void FUnityVersionControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 			)
 		);
 	}
+
+	AddViewBranches(Menu);
+}
+
+#if ENGINE_MAJOR_VERSION == 4
+void FUnityVersionControlMenu::AddViewBranches(FMenuBuilder& Menu)
+#elif ENGINE_MAJOR_VERSION == 5
+void FUnityVersionControlMenu::AddViewBranches(FToolMenuSection& Menu)
+#endif
+{
+	Menu.AddMenuEntry(
+#if ENGINE_MAJOR_VERSION == 5
+		TEXT("PlasticBranchesWindow"),
+#endif
+		LOCTEXT("PlasticBranchesWindow", "View Branches"),
+		LOCTEXT("PlasticBranchesWindowTooltip", "Open the Branches window."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Branch"),
+#elif ENGINE_MAJOR_VERSION == 5
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
+#elif ENGINE_MAJOR_VERSION == 4
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
+#endif
+		FUIAction(
+			FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::OpenBranchesWindow),
+			FCanExecuteAction()
+		)
+	);
 }
 
 #if ENGINE_MAJOR_VERSION == 4

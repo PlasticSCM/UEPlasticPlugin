@@ -3,6 +3,7 @@
 #include "UnityVersionControlOperations.h"
 
 #include "PackageUtils.h"
+#include "UnityVersionControlBranch.h"
 #include "UnityVersionControlCommand.h"
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlProvider.h"
@@ -46,6 +47,8 @@ void IUnityVersionControlWorker::RegisterWorkers(FUnityVersionControlProvider& U
 	UnityVersionControlProvider.RegisterWorker("RevertAll", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticRevertAllWorker>));
 	UnityVersionControlProvider.RegisterWorker("SwitchToPartialWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToPartialWorkspaceWorker>));
 	UnityVersionControlProvider.RegisterWorker("Unlock", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnlockWorker>));
+	UnityVersionControlProvider.RegisterWorker("GetBranches", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetBranchesWorker>));
+	UnityVersionControlProvider.RegisterWorker("SwitchToBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToBranchWorker>));
 	UnityVersionControlProvider.RegisterWorker("MakeWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticMakeWorkspaceWorker>));
 	UnityVersionControlProvider.RegisterWorker("Sync", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
 	UnityVersionControlProvider.RegisterWorker("SyncAll", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
@@ -84,6 +87,11 @@ FText FPlasticRevertUnchanged::GetInProgressString() const
 #else
 	return LOCTEXT("SourceControl_RevertUnchanged", "Reverting unchanged file(s) in Source Control...");
 #endif
+}
+
+FName FPlasticSyncAll::GetName() const
+{
+	return "SyncAll";
 }
 
 FName FPlasticRevertAll::GetName() const
@@ -131,6 +139,26 @@ FText FPlasticUnlock::GetInProgressString() const
 		return LOCTEXT("SourceControl_Unlock_Remove", "Removing Lock(s)...");
 	else
 		return LOCTEXT("SourceControl_Unlock_Release", "Releasing Lock(s)...");
+}
+
+FName FPlasticGetBranches::GetName() const
+{
+	return "GetBranches";
+}
+
+FText FPlasticGetBranches::GetInProgressString() const
+{
+	return LOCTEXT("SourceControl_GetBranches", "Getting the list of branches...");
+}
+
+FName FPlasticSwitchToBranch::GetName() const
+{
+	return "SwitchToBranch";
+}
+
+FText FPlasticSwitchToBranch::GetInProgressString() const
+{
+	return LOCTEXT("SourceControl_SwitchToBranch", "Switching the workspace to another branch...");
 }
 
 
@@ -1010,6 +1038,59 @@ bool FPlasticUnlockWorker::Execute(FUnityVersionControlCommand& InCommand)
 bool FPlasticUnlockWorker::UpdateStates()
 {
 	return UnityVersionControlUtils::UpdateCachedStates(MoveTemp(States));
+}
+
+FName FPlasticGetBranchesWorker::GetName() const
+{
+	return "GetBranches";
+}
+
+bool FPlasticGetBranchesWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetPendingChangelistsWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticGetBranches, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticGetBranches>(InCommand.Operation);
+
+	{
+		const FDateTime& FromDate = Operation->FromDate;
+		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunGetBranches(FromDate, Operation->Branches, InCommand.ErrorMessages);
+	}
+
+	{
+		FString RepositoryName, ServerUrl;
+		InCommand.bCommandSuccessful &= UnityVersionControlUtils::GetWorkspaceInfo(CurrentBranchName, RepositoryName, ServerUrl, InCommand.ErrorMessages);
+	}
+
+	return InCommand.bCommandSuccessful;
+}
+
+bool FPlasticGetBranchesWorker::UpdateStates()
+{
+	GetProvider().SetBranchName(MoveTemp(CurrentBranchName));
+
+	return false;
+}
+
+
+FName FPlasticSwitchToBranchWorker::GetName() const
+{
+	return "SwitchToBranch";
+}
+
+bool FPlasticSwitchToBranchWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetPendingChangelistsWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticSwitchToBranch, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticSwitchToBranch>(InCommand.Operation);
+
+	return UnityVersionControlUtils::RunSwitchToBranch(Operation->BranchName, Operation->UpdatedFiles, InCommand.ErrorMessages);
+}
+
+bool FPlasticSwitchToBranchWorker::UpdateStates()
+{
+	return false;
 }
 
 FName FPlasticUpdateStatusWorker::GetName() const

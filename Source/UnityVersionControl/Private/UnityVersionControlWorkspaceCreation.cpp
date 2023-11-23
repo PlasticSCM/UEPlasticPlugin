@@ -35,11 +35,11 @@ void FUnityVersionControlWorkspaceCreation::LaunchMakeWorkspaceOperation()
 	ECommandResult::Type Result = Provider.Execute(MakeWorkspaceOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlWorkspaceCreation::OnMakeWorkspaceOperationComplete));
 	if (Result == ECommandResult::Succeeded)
 	{
-		DisplayInProgressNotification(MakeWorkspaceOperation->GetInProgressString());
+		Notification.DisplayInProgress(MakeWorkspaceOperation->GetInProgressString());
 	}
 	else
 	{
-		DisplayFailureNotification(MakeWorkspaceOperation->GetName());
+		FNotification::DisplayFailure(MakeWorkspaceOperation->GetName());
 	}
 }
 
@@ -67,16 +67,16 @@ void FUnityVersionControlWorkspaceCreation::LaunchMarkForAddOperation()
 		ECommandResult::Type Result = Provider.Execute(MarkForAddOperation, ProjectFiles, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlWorkspaceCreation::OnMarkForAddOperationComplete));
 		if (Result == ECommandResult::Succeeded)
 		{
-			DisplayInProgressNotification(MarkForAddOperation->GetInProgressString());
+			Notification.DisplayInProgress(MarkForAddOperation->GetInProgressString());
 		}
 		else
 		{
-			DisplayFailureNotification(MarkForAddOperation->GetName());
+			FNotification::DisplayFailure(MarkForAddOperation->GetName());
 		}
 	}
 	else
 	{
-		DisplayFailureNotification(MarkForAddOperation->GetName());
+		FNotification::DisplayFailure(MarkForAddOperation->GetName());
 	}
 }
 
@@ -98,11 +98,11 @@ void FUnityVersionControlWorkspaceCreation::LaunchCheckInOperation()
 	ECommandResult::Type Result = Provider.Execute(CheckInOperation, ProjectFiles, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlWorkspaceCreation::OnCheckInOperationComplete));
 	if (Result == ECommandResult::Succeeded)
 	{
-		DisplayInProgressNotification(CheckInOperation->GetInProgressString());
+		Notification.DisplayInProgress(CheckInOperation->GetInProgressString());
 	}
 	else
 	{
-		DisplayFailureNotification(CheckInOperation->GetName());
+		FNotification::DisplayFailure(CheckInOperation->GetName());
 	}
 }
 
@@ -115,69 +115,17 @@ void FUnityVersionControlWorkspaceCreation::OnCheckInOperationComplete(const FSo
 
 void FUnityVersionControlWorkspaceCreation::OnSourceControlOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult)
 {
-	RemoveInProgressNotification();
+	Notification.RemoveInProgress();
 
 	// Report result with a notification
 	if (InResult == ECommandResult::Succeeded)
 	{
-		DisplaySuccessNotification(InOperation->GetName());
+		FNotification::DisplaySuccess(InOperation->GetName());
 	}
 	else
 	{
-		DisplayFailureNotification(InOperation->GetName());
+		FNotification::DisplayFailure(InOperation->GetName());
 	}
-}
-
-// Display an ongoing notification during the whole operation
-void FUnityVersionControlWorkspaceCreation::DisplayInProgressNotification(const FText& InOperationInProgressString)
-{
-	if (!OperationInProgressNotification.IsValid())
-	{
-		FNotificationInfo Info(InOperationInProgressString);
-		Info.bFireAndForget = false;
-		Info.ExpireDuration = 0.0f;
-		Info.FadeOutDuration = 1.0f;
-		OperationInProgressNotification = FSlateNotificationManager::Get().AddNotification(Info);
-		if (OperationInProgressNotification.IsValid())
-		{
-			OperationInProgressNotification.Pin()->SetCompletionState(SNotificationItem::CS_Pending);
-		}
-	}
-}
-
-// Remove the ongoing notification at the end of the operation
-void FUnityVersionControlWorkspaceCreation::RemoveInProgressNotification()
-{
-	if (OperationInProgressNotification.IsValid())
-	{
-		OperationInProgressNotification.Pin()->ExpireAndFadeout();
-		OperationInProgressNotification.Reset();
-	}
-}
-
-// Display a temporary success notification at the end of the operation
-void FUnityVersionControlWorkspaceCreation::DisplaySuccessNotification(const FName& InOperationName)
-{
-	const FText NotificationText = FText::Format(LOCTEXT("InitWorkspace_Success", "{0} operation was successful!"), FText::FromName(InOperationName));
-	FNotificationInfo Info(NotificationText);
-	Info.bUseSuccessFailIcons = true;
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-	Info.Image = FAppStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#else
-	Info.Image = FEditorStyle::GetBrush(TEXT("NotificationList.SuccessImage"));
-#endif
-	FSlateNotificationManager::Get().AddNotification(Info);
-	UE_LOG(LogSourceControl, Verbose, TEXT("%s"), *NotificationText.ToString());
-}
-
-// Display a temporary failure notification at the end of the operation
-void FUnityVersionControlWorkspaceCreation::DisplayFailureNotification(const FName& InOperationName)
-{
-	const FText NotificationText = FText::Format(LOCTEXT("InitWorkspace_Failure", "Error: {0} operation failed!"), FText::FromName(InOperationName));
-	FNotificationInfo Info(NotificationText);
-	Info.ExpireDuration = 8.0f;
-	FSlateNotificationManager::Get().AddNotification(Info);
-	UE_LOG(LogSourceControl, Error, TEXT("%s"), *NotificationText.ToString());
 }
 
 /** Path to the "ignore.conf" file */

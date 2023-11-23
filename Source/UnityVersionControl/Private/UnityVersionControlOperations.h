@@ -19,6 +19,8 @@
 #endif
 
 class FUnityVersionControlProvider;
+typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
+
 
 /**
  * Internal operation used to revert checked-out unchanged files
@@ -41,10 +43,7 @@ class FPlasticSyncAll final : public FSync
 {
 public:
 	// ISourceControlOperation interface
-	virtual FName GetName() const override
-	{
-		return "SyncAll";
-	}
+	virtual FName GetName() const override;
 
 	/** List of files updated by the operation */
 	TArray<FString> UpdatedFiles;
@@ -81,7 +80,7 @@ public:
 	FString WorkspaceName;
 	FString RepositoryName;
 	FString ServerUrl;
-	bool bPartialWorkspace;
+	bool bPartialWorkspace = false;
 };
 
 
@@ -111,6 +110,44 @@ public:
 
 	// Release the Lock(s), and optionally remove (delete) them completely
 	bool bRemove = false;
+};
+
+
+/**
+ * Internal operation to list branches, aka "cm find branch"
+*/
+class FPlasticGetBranches final : public ISourceControlOperation
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	// Limit the list of branches to ones created from this date
+	FDateTime FromDate;
+
+	// List of branches found
+	TArray<FUnityVersionControlBranchRef> Branches;
+};
+
+
+/**
+ * Internal operation used to switch the workspace to another branch
+*/
+class FPlasticSwitchToBranch final : public ISourceControlOperation
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	// Branch to switch the workspace to
+	FString BranchName;
+
+	/** List of files updated by the operation */
+	TArray<FString> UpdatedFiles;
 };
 
 
@@ -335,6 +372,37 @@ public:
 public:
 	/** Temporary states for results */
 	TArray<FUnityVersionControlState> States;
+};
+
+/** list branches. */
+class FPlasticGetBranchesWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticGetBranchesWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticGetBranchesWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+
+	// Current branch the workspace is on (at the end of the operation)
+	FString CurrentBranchName;
+};
+
+/** Switch workspace to another branch. */
+class FPlasticSwitchToBranchWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticSwitchToBranchWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticSwitchToBranchWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
 };
 
 /** Plastic update the workspace to latest changes */

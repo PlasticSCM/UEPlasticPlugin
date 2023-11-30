@@ -38,7 +38,7 @@ FText UnityVersionControlBranchesListViewColumn::Comment::GetToolTipText() { ret
 void SUnityVersionControlBranchRow::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwner)
 {
 	BranchToVisualize = static_cast<FUnityVersionControlBranch*>(InArgs._BranchToVisualize.Get());
-	bIsCurrentBranch = InArgs._bIsCurrentBranch.Get();
+	bIsCurrentBranch = InArgs._bIsCurrentBranch;
 	HighlightText = InArgs._HighlightText;
 
 	FSuperRowType::FArguments Args = FSuperRowType::FArguments()

@@ -49,6 +49,7 @@ void IUnityVersionControlWorker::RegisterWorkers(FUnityVersionControlProvider& U
 	UnityVersionControlProvider.RegisterWorker("Unlock", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnlockWorker>));
 	UnityVersionControlProvider.RegisterWorker("GetBranches", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetBranchesWorker>));
 	UnityVersionControlProvider.RegisterWorker("SwitchToBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToBranchWorker>));
+	UnityVersionControlProvider.RegisterWorker("CreateBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticCreateBranchWorker>));
 	UnityVersionControlProvider.RegisterWorker("MakeWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticMakeWorkspaceWorker>));
 	UnityVersionControlProvider.RegisterWorker("Sync", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
 	UnityVersionControlProvider.RegisterWorker("SyncAll", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
@@ -159,6 +160,16 @@ FName FPlasticSwitchToBranch::GetName() const
 FText FPlasticSwitchToBranch::GetInProgressString() const
 {
 	return LOCTEXT("SourceControl_SwitchToBranch", "Switching the workspace to another branch...");
+}
+
+FName FPlasticCreateBranch::GetName() const
+{
+	return "CreateBranch";
+}
+
+FText FPlasticCreateBranch::GetInProgressString() const
+{
+	return LOCTEXT("SourceControl_Branch", "Creating new child branch...");
 }
 
 
@@ -1047,7 +1058,7 @@ FName FPlasticGetBranchesWorker::GetName() const
 
 bool FPlasticGetBranchesWorker::Execute(FUnityVersionControlCommand& InCommand)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetPendingChangelistsWorker::Execute);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetBranchesWorker::Execute);
 
 	check(InCommand.Operation->GetName() == GetName());
 	TSharedRef<FPlasticGetBranches, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticGetBranches>(InCommand.Operation);
@@ -1080,7 +1091,7 @@ FName FPlasticSwitchToBranchWorker::GetName() const
 
 bool FPlasticSwitchToBranchWorker::Execute(FUnityVersionControlCommand& InCommand)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetPendingChangelistsWorker::Execute);
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticSwitchToBranchWorker::Execute);
 
 	check(InCommand.Operation->GetName() == GetName());
 	TSharedRef<FPlasticSwitchToBranch, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticSwitchToBranch>(InCommand.Operation);
@@ -1092,6 +1103,28 @@ bool FPlasticSwitchToBranchWorker::UpdateStates()
 {
 	return false;
 }
+
+
+FName FPlasticCreateBranchWorker::GetName() const
+{
+	return "CreateBranch";
+}
+
+bool FPlasticCreateBranchWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticCreateBranchWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticCreateBranch, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticCreateBranch>(InCommand.Operation);
+
+	return UnityVersionControlUtils::RunCreateBranch(Operation->BranchName, Operation->Comment, InCommand.ErrorMessages);
+}
+
+bool FPlasticCreateBranchWorker::UpdateStates()
+{
+	return false;
+}
+
 
 FName FPlasticUpdateStatusWorker::GetName() const
 {

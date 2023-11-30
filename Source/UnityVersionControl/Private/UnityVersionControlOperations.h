@@ -151,6 +151,22 @@ public:
 };
 
 
+/**
+ * Internal operation used to create a branch
+*/
+class FPlasticCreateBranch final : public ISourceControlOperation
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	FString BranchName;
+	FString Comment;
+};
+
+
 /** Called when first activated on a project, and then at project load time.
  *  Look for the root directory of the Plastic workspace (where the ".plastic/" subdirectory is located). */
 class FPlasticConnectWorker final : public IUnityVersionControlWorker
@@ -399,6 +415,20 @@ public:
 		: IUnityVersionControlWorker(InSourceControlProvider)
 	{}
 	virtual ~FPlasticSwitchToBranchWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+};
+
+/** Create a new child branch. */
+class FPlasticCreateBranchWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticCreateBranchWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticCreateBranchWorker() = default;
 	// IUnityVersionControlWorker interface
 	virtual FName GetName() const override;
 	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;

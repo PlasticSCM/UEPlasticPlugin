@@ -7,6 +7,7 @@
 #include "UnityVersionControlProjectSettings.h"
 #include "UnityVersionControlBranch.h"
 #include "SUnityVersionControlBranchRow.h"
+#include "SUnityVersionControlCreateBranch.h"
 
 #include "PackageUtils.h"
 
@@ -29,6 +30,7 @@
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Views/SHeaderRow.h"
+#include "Widgets/SWindow.h"
 
 #define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
 
@@ -41,7 +43,7 @@ void SUnityVersionControlBranchesWidget::Construct(const FArguments& InArgs)
 	SearchTextFilter = MakeShared<TTextFilter<const FUnityVersionControlBranch&>>(TTextFilter<const FUnityVersionControlBranch&>::FItemToStringArray::CreateSP(this, &SUnityVersionControlBranchesWidget::PopulateItemSearchStrings));
 	SearchTextFilter->OnChanged().AddSP(this, &SUnityVersionControlBranchesWidget::OnRefreshUI);
 
-	FromDateInDaysValues.Add(TPair<int32, FText>( 7, FText::FromString(TEXT("Last week"))));
+	FromDateInDaysValues.Add(TPair<int32, FText>(7, FText::FromString(TEXT("Last week"))));
 	FromDateInDaysValues.Add(TPair<int32, FText>(30, FText::FromString(TEXT("Last month"))));
 	FromDateInDaysValues.Add(TPair<int32, FText>(90, FText::FromString(TEXT("Last 3 months"))));
 	FromDateInDaysValues.Add(TPair<int32, FText>(365, FText::FromString(TEXT("Last year"))));
@@ -546,6 +548,16 @@ TSharedPtr<SWidget> SUnityVersionControlBranchesWidget::OnOpenContextMenu()
 	FToolMenuSection& Section = *Menu->FindSection("Source Control");
 
 	Section.AddMenuEntry(
+		TEXT("CreateChildBranch"),
+		LOCTEXT("CreateChildBranch", "Create child branch"),
+		LOCTEXT("CreateChildBranchTooltip", "Create child branch from the selected branch."),
+		FSlateIcon(),
+		FUIAction(
+			FExecuteAction::CreateSP(this, &SUnityVersionControlBranchesWidget::OnCreateBranchClicked, SelectedBranch)
+		)
+	);
+
+	Section.AddMenuEntry(
 		TEXT("SwitchToBranch"),
 		LOCTEXT("SwitchToBranch", "Switch workspace to this branch"),
 		LOCTEXT("SwitchToBranchTooltip", "Switch workspace to this branch."),
@@ -556,8 +568,88 @@ TSharedPtr<SWidget> SUnityVersionControlBranchesWidget::OnOpenContextMenu()
 		)
 	);
 
-
 	return ToolMenus->GenerateWidget(Menu);
+}
+
+
+TSharedPtr<SWindow> SUnityVersionControlBranchesWidget::CreateDialogWindow(FText&& InTitle)
+{
+	return SNew(SWindow)
+		.Title(InTitle)
+		.HasCloseButton(true)
+		.SupportsMaximize(false)
+		.SupportsMinimize(false)
+		.SizingRule(ESizingRule::Autosized);
+}
+
+void SUnityVersionControlBranchesWidget::OpenDialogWindow(TSharedPtr<SWindow>& InDialogWindowPtr)
+{
+	InDialogWindowPtr->SetOnWindowClosed(FOnWindowClosed::CreateSP(this, &SUnityVersionControlBranchesWidget::OnDialogClosed));
+
+	TSharedPtr<SWindow> RootWindow = FGlobalTabmanager::Get()->GetRootWindow();
+	FSlateApplication::Get().AddModalWindow(InDialogWindowPtr.ToSharedRef(), RootWindow);
+}
+
+void SUnityVersionControlBranchesWidget::OnDialogClosed(const TSharedRef<SWindow>& InWindow)
+{
+	DialogWindowPtr = nullptr;
+}
+
+void SUnityVersionControlBranchesWidget::OnCreateBranchClicked(FString InParentBranchName)
+{
+	// Create the branch modal dialog window (the frame for the content)
+	DialogWindowPtr = CreateDialogWindow(LOCTEXT("PlasticCreateBranchTitle", "Create Branch"));
+
+	// Setup its content widget, specific to the CreateBranch operation
+	DialogWindowPtr->SetContent(SNew(SUnityVersionControlCreateBranch)
+		.BranchesWidget(SharedThis(this))
+		.ParentWindow(DialogWindowPtr)
+		.ParentBranchName(InParentBranchName));
+
+	OpenDialogWindow(DialogWindowPtr);
+}
+
+void SUnityVersionControlBranchesWidget::CreateBranch(const FString& InParentBranchName, const FString& InNewBranchName, const FString& InNewBranchComment, const bool bInSwitchWorkspace)
+{
+	if (!Notification.IsInProgress())
+	{
+		const bool bSaved = PackageUtils::SaveDirtyPackages();
+		if (bSaved || bInSwitchWorkspace)
+		{
+			// Find and Unlink all loaded packages in Content directory to allow to update them
+			PackageUtils::UnlinkPackages(PackageUtils::ListAllPackages());
+
+			// Launch a custom "CreateBranch" operation
+			FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+			TSharedRef<FPlasticCreateBranch, ESPMode::ThreadSafe> CreateBranchOperation = ISourceControlOperation::Create<FPlasticCreateBranch>();
+			CreateBranchOperation->BranchName = InParentBranchName + TEXT("/") + InNewBranchName;
+			CreateBranchOperation->Comment = InNewBranchComment;
+			const ECommandResult::Type Result = Provider.Execute(CreateBranchOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SUnityVersionControlBranchesWidget::OnCreateBranchOperationComplete, bInSwitchWorkspace));
+			if (Result == ECommandResult::Succeeded)
+			{
+				// Display an ongoing notification during the whole operation (packages will be reloaded at the completion of the operation)
+				Notification.DisplayInProgress(CreateBranchOperation->GetInProgressString());
+				StartRefreshStatus();
+			}
+			else
+			{
+				// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
+				FNotification::DisplayFailure(CreateBranchOperation->GetName());
+			}
+		}
+		else
+		{
+			FMessageLog SourceControlLog("SourceControl");
+			SourceControlLog.Warning(LOCTEXT("SourceControlMenu_Switch_Unsaved", "Save All Assets before attempting to Switch workspace to a branch!"));
+			SourceControlLog.Notify();
+		}
+	}
+	else
+	{
+		FMessageLog SourceControlLog("SourceControl");
+		SourceControlLog.Warning(LOCTEXT("SourceControlMenu_InProgress", "Source control operation already in progress"));
+		SourceControlLog.Notify();
+	}
 }
 
 void SUnityVersionControlBranchesWidget::OnSwitchToBranchClicked(FString InBranchName)
@@ -590,7 +682,7 @@ void SUnityVersionControlBranchesWidget::OnSwitchToBranchClicked(FString InBranc
 		else
 		{
 			FMessageLog SourceControlLog("SourceControl");
-			SourceControlLog.Warning(LOCTEXT("SourceControlMenu_Sync_Unsaved", "Save All Assets before attempting to Sync!"));
+			SourceControlLog.Warning(LOCTEXT("SourceControlMenu_Switch_Unsaved", "Save All Assets before attempting to Switch workspace to a branch!"));
 			SourceControlLog.Notify();
 		}
 	}
@@ -683,13 +775,42 @@ void SUnityVersionControlBranchesWidget::OnGetBranchesOperationComplete(const FS
 	OnRefreshUI();
 }
 
+void SUnityVersionControlBranchesWidget::OnCreateBranchOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult, const bool bInSwitchWorkspace)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(SUnityVersionControlBranchesWidget::OnCreateBranchOperationComplete);
+
+	Notification.RemoveInProgress();
+
+	if (InResult == ECommandResult::Succeeded)
+	{
+		FNotification::DisplaySuccess(InOperation->GetName());
+
+		if (bInSwitchWorkspace)
+		{
+			TSharedRef<FPlasticCreateBranch, ESPMode::ThreadSafe> CreateBranchOperation = StaticCastSharedRef<FPlasticCreateBranch>(InOperation);
+			OnSwitchToBranchClicked(CreateBranchOperation->BranchName);
+		}
+		else
+		{
+			// Ask for a full refresh of the list of branches (and don't call EndRefreshStatus() yet)
+			bShouldRefresh = true;
+		}
+	}
+	else
+	{
+		FNotification::DisplayFailure(InOperation->GetName());
+
+		EndRefreshStatus();
+	}
+}
+
 void SUnityVersionControlBranchesWidget::OnSwitchToBranchOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(SUnityVersionControlBranchesWidget::OnSwitchToBranchOperationComplete);
 
 	// Reload packages that where updated by the SwitchToBranch operation (and the current map if needed)
-	TSharedRef<FPlasticSwitchToBranch, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticSwitchToBranch>(InOperation);
-	PackageUtils::ReloadPackages(Operation->UpdatedFiles);
+	TSharedRef<FPlasticSwitchToBranch, ESPMode::ThreadSafe> SwitchToBranchOperation = StaticCastSharedRef<FPlasticSwitchToBranch>(InOperation);
+	PackageUtils::ReloadPackages(SwitchToBranchOperation->UpdatedFiles);
 
 	// Ask for a full refresh of the list of branches (and don't call EndRefreshStatus() yet)
 	bShouldRefresh = true;

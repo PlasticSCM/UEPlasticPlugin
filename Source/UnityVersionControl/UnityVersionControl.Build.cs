@@ -8,9 +8,6 @@ public class UnityVersionControl : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		// Note: from UE5.4 onward, replaced by IWYUSupport = IWYUSupport.Full; 
-		bEnforceIWYU = true;
-
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
@@ -31,8 +28,5 @@ public class UnityVersionControl : ModuleRules
 				"ContentBrowser",
 			}
 		);
-
-		// NOTE: this produce warnings in SListView Engine code in UE4.27
-		UnsafeTypeCastWarningLevel = WarningLevel.Warning;
 	}
 }

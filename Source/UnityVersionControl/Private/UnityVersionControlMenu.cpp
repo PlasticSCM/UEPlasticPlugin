@@ -325,32 +325,25 @@ void FUnityVersionControlMenu::SyncProjectClicked()
 {
 	if (!Notification.IsInProgress())
 	{
-		const bool bSaved = PackageUtils::SaveDirtyPackages();
-		if (bSaved)
-		{
-			// Find and Unlink all loaded packages in Content directory to allow to update them
-			PackageUtils::UnlinkPackages(PackageUtils::ListAllPackages());
+		// Warn the user about any unsaved assets (risk of losing work) but don't enforce saving them (reduces friction and solves some user scenario)
+		PackageUtils::SaveDirtyPackages();
 
-			// Launch a custom "SyncAll" operation
-			FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-			TSharedRef<FPlasticSyncAll, ESPMode::ThreadSafe> SyncOperation = ISourceControlOperation::Create<FPlasticSyncAll>();
-			const ECommandResult::Type Result = Provider.Execute(SyncOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlMenu::OnSyncAllOperationComplete));
-			if (Result == ECommandResult::Succeeded)
-			{
-				// Display an ongoing notification during the whole operation (packages will be reloaded at the completion of the operation)
-				Notification.DisplayInProgress(SyncOperation->GetInProgressString());
-			}
-			else
-			{
-				// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
-				FNotification::DisplayFailure(SyncOperation.Get());
-			}
+		// Find and Unlink all loaded packages in Content directory to allow to update them
+		PackageUtils::UnlinkPackages(PackageUtils::ListAllPackages());
+
+		// Launch a custom "SyncAll" operation
+		FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+		TSharedRef<FPlasticSyncAll, ESPMode::ThreadSafe> SyncOperation = ISourceControlOperation::Create<FPlasticSyncAll>();
+		const ECommandResult::Type Result = Provider.Execute(SyncOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlMenu::OnSyncAllOperationComplete));
+		if (Result == ECommandResult::Succeeded)
+		{
+			// Display an ongoing notification during the whole operation (packages will be reloaded at the completion of the operation)
+			Notification.DisplayInProgress(SyncOperation->GetInProgressString());
 		}
 		else
 		{
-			FMessageLog SourceControlLog("SourceControl");
-			SourceControlLog.Warning(LOCTEXT("SourceControlMenu_Sync_Unsaved", "Save All Assets before attempting to Sync!"));
-			SourceControlLog.Notify();
+			// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
+			FNotification::DisplayFailure(SyncOperation.Get());
 		}
 	}
 	else
@@ -406,32 +399,25 @@ void FUnityVersionControlMenu::RevertAllClicked()
 		);
 		if (Choice == EAppReturnType::Ok)
 		{
-			const bool bSaved = PackageUtils::SaveDirtyPackages();
-			if (bSaved)
-			{
-				// Find and Unlink all packages in Content directory to allow to update them
-				PackageUtils::UnlinkPackages(PackageUtils::ListAllPackages());
+			// Warn the user about any unsaved assets (risk of losing work) but don't enforce saving them (reduces friction and solves some user scenario)
+			PackageUtils::SaveDirtyPackages();
 
-				// Launch a "RevertAll" Operation
-				FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-				TSharedRef<FPlasticRevertAll, ESPMode::ThreadSafe> RevertAllOperation = ISourceControlOperation::Create<FPlasticRevertAll>();
-				const ECommandResult::Type Result = Provider.Execute(RevertAllOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlMenu::OnRevertAllOperationComplete));
-				if (Result == ECommandResult::Succeeded)
-				{
-					// Display an ongoing notification during the whole operation
-					Notification.DisplayInProgress(RevertAllOperation->GetInProgressString());
-				}
-				else
-				{
-					// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
-					FNotification::DisplayFailure(RevertAllOperation.Get());
-				}
+			// Find and Unlink all packages in Content directory to allow to update them
+			PackageUtils::UnlinkPackages(PackageUtils::ListAllPackages());
+
+			// Launch a "RevertAll" Operation
+			FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+			TSharedRef<FPlasticRevertAll, ESPMode::ThreadSafe> RevertAllOperation = ISourceControlOperation::Create<FPlasticRevertAll>();
+			const ECommandResult::Type Result = Provider.Execute(RevertAllOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlMenu::OnRevertAllOperationComplete));
+			if (Result == ECommandResult::Succeeded)
+			{
+				// Display an ongoing notification during the whole operation
+				Notification.DisplayInProgress(RevertAllOperation->GetInProgressString());
 			}
 			else
 			{
-				FMessageLog SourceControlLog("SourceControl");
-				SourceControlLog.Warning(LOCTEXT("SourceControlMenu_Sync_Unsaved", "Save All Assets before attempting to Sync!"));
-				SourceControlLog.Notify();
+				// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
+				FNotification::DisplayFailure(RevertAllOperation.Get());
 			}
 		}
 	}

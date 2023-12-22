@@ -49,7 +49,7 @@ void IUnityVersionControlWorker::RegisterWorkers(FUnityVersionControlProvider& U
 	UnityVersionControlProvider.RegisterWorker("SwitchToPartialWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToPartialWorkspaceWorker>));
 	UnityVersionControlProvider.RegisterWorker("Unlock", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnlockWorker>));
 	UnityVersionControlProvider.RegisterWorker("GetBranches", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetBranchesWorker>));
-	UnityVersionControlProvider.RegisterWorker("SwitchToBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToBranchWorker>));
+	UnityVersionControlProvider.RegisterWorker("Switch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToBranchWorker>));
 	UnityVersionControlProvider.RegisterWorker("Merge", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticMergeBranchWorker>));
 	UnityVersionControlProvider.RegisterWorker("CreateBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticCreateBranchWorker>));
 	UnityVersionControlProvider.RegisterWorker("RenameBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticRenameBranchWorker>));
@@ -1087,7 +1087,7 @@ bool FPlasticGetBranchesWorker::Execute(FUnityVersionControlCommand& InCommand)
 
 bool FPlasticGetBranchesWorker::UpdateStates()
 {
-	GetProvider().SetBranchName(MoveTemp(CurrentBranchName));
+	GetProvider().SetBranchName(CurrentBranchName);
 
 	return false;
 }
@@ -1108,8 +1108,10 @@ bool FPlasticSwitchToBranchWorker::Execute(FUnityVersionControlCommand& InComman
 	InCommand.bCommandSuccessful = UnityVersionControlUtils::RunSwitchToBranch(Operation->BranchName, Operation->UpdatedFiles, InCommand.ErrorMessages);
 
 	// now update the status of the updated files
-	if (Operation->UpdatedFiles.Num())
+	if (InCommand.bCommandSuccessful && Operation->UpdatedFiles.Num())
 	{
+		// the current branch is used to asses the status of Retained Locks
+		GetProvider().SetBranchName(Operation->BranchName);
 		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunUpdateStatus(Operation->UpdatedFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 	}
 

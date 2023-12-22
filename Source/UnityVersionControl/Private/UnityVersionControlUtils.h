@@ -14,12 +14,39 @@ class FUnityVersionControlState;
 struct FSoftwareVersion;
 typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
 
+namespace UnityVersionControlParsers
+{
+class FSmartLockInfoParser;
+} // namespace UnityVersionControlParsers
+
 enum class EWorkspaceState;
 
 namespace UnityVersionControlUtils
 {
 
-const struct FSoftwareVersion& GetOldestSupportedPlasticScmVersion();
+/**
+ * Run a Plastic command - the result is the output of cm, as a multi-line string.
+ *
+ * @param	InCommand			The Plastic command - e.g. commit
+ * @param	InParameters		The parameters to the Plastic command
+ * @param	InFiles				The files to be operated on
+ * @param	OutResults			The results (from StdOut) as a multi-line string.
+ * @param	OutErrors			Any errors (from StdErr) as a multi-line string.
+ * @returns true if the command succeeded and returned no errors
+ */
+bool RunCommand(const FString& InCommand, const TArray<FString>& InParameters, const TArray<FString>& InFiles, FString& OutResults, FString& OutErrors);
+
+/**
+ * Run a Plastic command - the result is parsed in an array of strings.
+ *
+ * @param	InCommand			The Plastic command - e.g. commit
+ * @param	InParameters		The parameters to the Plastic command
+ * @param	InFiles				The files to be operated on
+ * @param	OutResults			The results (from StdOut) as an array per-line
+ * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
+ * @returns true if the command succeeded and returned no errors
+ */
+bool RunCommand(const FString& InCommand, const TArray<FString>& InParameters, const TArray<FString>& InFiles, TArray<FString>& OutResults, TArray<FString>& OutErrorMessages);
 
 /**
  * Find the path to the Plastic binary: for now relying on the Path to access the "cm" command.
@@ -105,29 +132,13 @@ bool RunCheckConnection(FString& OutBranchName, FString& OutRepositoryName, FStr
 FString UserNameToDisplayName(const FString& InUserName);
 
 /**
- * Run a Plastic command - the result is the output of cm, as a multi-line string.
+ * Run a Plastic "lock list" command and parse it.
  *
- * @param	InCommand			The Plastic command - e.g. commit
- * @param	InParameters		The parameters to the Plastic command
- * @param	InFiles				The files to be operated on
- * @param	OutResults			The results (from StdOut) as a multi-line string.
- * @param	OutErrors			Any errors (from StdErr) as a multi-line string.
+ * @param	InRepository		The repository to ask for the locks
+ * @param	OutSmartLocks		The list of smart locks
  * @returns true if the command succeeded and returned no errors
  */
-bool RunCommand(const FString& InCommand, const TArray<FString>& InParameters, const TArray<FString>& InFiles, FString& OutResults, FString& OutErrors);
-
-/**
- * Run a Plastic command - the result is parsed in an array of strings.
- *
- * @param	InCommand			The Plastic command - e.g. commit
- * @param	InParameters		The parameters to the Plastic command
- * @param	InFiles				The files to be operated on
- * @param	OutResults			The results (from StdOut) as an array per-line
- * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
- * @returns true if the command succeeded and returned no errors
- */
-bool RunCommand(const FString& InCommand, const TArray<FString>& InParameters, const TArray<FString>& InFiles, TArray<FString>& OutResults, TArray<FString>& OutErrorMessages);
-
+bool RunListSmartLocks(const FString& InRepository, TMap<FString, UnityVersionControlParsers::FSmartLockInfoParser>& OutSmartLocks);
 
 // Specify the "search type" for the "status" command
 enum class EStatusSearchType
@@ -234,12 +245,35 @@ bool RunGetBranches(const FDateTime& InFromDate, TArray<FUnityVersionControlBran
 bool RunSwitchToBranch(const FString& InBranchName, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages);
 
 /**
+ * Run merge br:/name and parse the results.
+ * @param	InBranchName			The name of the branch to merge to the current branch
+ * @param	OutUpdatedFiles			The files that where updated
+ * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
+ */
+bool RunMergeBranch(const FString& InBranchName, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages);
+
+/**
  * Run branch create <name> --commentsfile
  * @param	InBranchName			The name of the branch to create
  * @param	InComment				The comment for the new branch to create
  * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
  */
 bool RunCreateBranch(const FString& InBranchName, const FString& InComment, TArray<FString>& OutErrorMessages);
+
+/**
+ * Run branch rename <old name> <new name>
+ * @param	InOldName				The old name of the branch to rename
+ * @param	InNewName				The new name to rename the branch to
+ * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
+ */
+bool RunRenameBranch(const FString& InOldName, const FString& InNewName, TArray<FString>& OutErrorMessages);
+
+/**
+ * Run branch delete <name1> <name2 ...>
+ * @param	InBranchNames			The name of the branch(es) to delete
+ * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
+ */
+bool RunDeleteBranches(const TArray<FString>& InBranchNames, TArray<FString>& OutErrorMessages);
 
 /**
  * Helper function for various commands to update cached states.

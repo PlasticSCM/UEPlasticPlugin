@@ -39,7 +39,7 @@ void FUnityVersionControlWorkspaceCreation::LaunchMakeWorkspaceOperation()
 	}
 	else
 	{
-		FNotification::DisplayFailure(MakeWorkspaceOperation->GetName());
+		FNotification::DisplayFailure(MakeWorkspaceOperation.Get());
 	}
 }
 
@@ -71,12 +71,12 @@ void FUnityVersionControlWorkspaceCreation::LaunchMarkForAddOperation()
 		}
 		else
 		{
-			FNotification::DisplayFailure(MarkForAddOperation->GetName());
+			FNotification::DisplayFailure(MarkForAddOperation.Get());
 		}
 	}
 	else
 	{
-		FNotification::DisplayFailure(MarkForAddOperation->GetName());
+		FNotification::DisplayFailure(MarkForAddOperation.Get());
 	}
 }
 
@@ -102,7 +102,7 @@ void FUnityVersionControlWorkspaceCreation::LaunchCheckInOperation()
 	}
 	else
 	{
-		FNotification::DisplayFailure(CheckInOperation->GetName());
+		FNotification::DisplayFailure(CheckInOperation.Get());
 	}
 }
 
@@ -118,14 +118,7 @@ void FUnityVersionControlWorkspaceCreation::OnSourceControlOperationComplete(con
 	Notification.RemoveInProgress();
 
 	// Report result with a notification
-	if (InResult == ECommandResult::Succeeded)
-	{
-		FNotification::DisplaySuccess(InOperation->GetName());
-	}
-	else
-	{
-		FNotification::DisplayFailure(InOperation->GetName());
-	}
+	FNotification::DisplayResult(InOperation, InResult);
 }
 
 /** Path to the "ignore.conf" file */

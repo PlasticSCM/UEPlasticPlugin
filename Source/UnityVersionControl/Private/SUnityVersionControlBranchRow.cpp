@@ -3,6 +3,7 @@
 #include "SUnityVersionControlBranchRow.h"
 
 #include "UnityVersionControlBranch.h"
+#include "UnityVersionControlUtils.h"
 
 #include "Widgets/Text/STextBlock.h"
 
@@ -37,7 +38,7 @@ FText UnityVersionControlBranchesListViewColumn::Comment::GetToolTipText() { ret
 
 void SUnityVersionControlBranchRow::Construct(const FArguments& InArgs, const TSharedRef<STableViewBase>& InOwner)
 {
-	BranchToVisualize = static_cast<FUnityVersionControlBranch*>(InArgs._BranchToVisualize.Get());
+	BranchToVisualize = InArgs._BranchToVisualize.Get();
 	bIsCurrentBranch = InArgs._bIsCurrentBranch;
 	HighlightText = InArgs._HighlightText;
 
@@ -78,7 +79,7 @@ TSharedRef<SWidget> SUnityVersionControlBranchRow::GenerateWidgetForColumn(const
 	else if (InColumnId == UnityVersionControlBranchesListViewColumn::CreatedBy::Id())
 	{
 		return SNew(STextBlock)
-			.Text(FText::FromString(BranchToVisualize->CreatedBy))
+			.Text(FText::FromString(UnityVersionControlUtils::UserNameToDisplayName(BranchToVisualize->CreatedBy)))
 			.ToolTipText(FText::FromString(BranchToVisualize->CreatedBy))
 			.Margin(FMargin(6.f, 1.f))
 			.Font(FontInfo)

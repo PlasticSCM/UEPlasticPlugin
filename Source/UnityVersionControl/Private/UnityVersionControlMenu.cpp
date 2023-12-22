@@ -304,7 +304,7 @@ void FUnityVersionControlMenu::ExecuteUnlock(const TArray<FAssetData>& InAssetOb
 		else
 		{
 			// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
-			FNotification::DisplayFailure(UnlockOperation->GetName());
+			FNotification::DisplayFailure(UnlockOperation.Get());
 		}
 	}
 	else
@@ -343,7 +343,7 @@ void FUnityVersionControlMenu::SyncProjectClicked()
 			else
 			{
 				// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
-				FNotification::DisplayFailure(SyncOperation->GetName());
+				FNotification::DisplayFailure(SyncOperation.Get());
 			}
 		}
 		else
@@ -377,7 +377,7 @@ void FUnityVersionControlMenu::RevertUnchangedClicked()
 		else
 		{
 			// Report failure with a notification
-			FNotification::DisplayFailure(RevertUnchangedOperation->GetName());
+			FNotification::DisplayFailure(RevertUnchangedOperation.Get());
 		}
 	}
 	else
@@ -393,8 +393,17 @@ void FUnityVersionControlMenu::RevertAllClicked()
 	if (!Notification.IsInProgress())
 	{
 		// Ask the user before reverting all!
-		const FText DialogText(LOCTEXT("SourceControlMenu_AskRevertAll", "Revert all modifications into the workspace?"));
-		const EAppReturnType::Type Choice = FMessageDialog::Open(EAppMsgType::OkCancel, DialogText);
+		const FText AskRevertAllWarning(LOCTEXT("SourceControlMenu_AskRevertAll", "Revert all modifications into the workspace?\n"
+			"This cannot be undone."));
+		const EAppReturnType::Type Choice = FMessageDialog::Open(
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+			EAppMsgCategory::Warning,
+#endif
+			EAppMsgType::OkCancel, AskRevertAllWarning
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+			, LOCTEXT("SourceControlMenu_AskRevertAllTitle", "Revert All?")
+#endif
+		);
 		if (Choice == EAppReturnType::Ok)
 		{
 			const bool bSaved = PackageUtils::SaveDirtyPackages();
@@ -415,7 +424,7 @@ void FUnityVersionControlMenu::RevertAllClicked()
 				else
 				{
 					// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
-					FNotification::DisplayFailure(RevertAllOperation->GetName());
+					FNotification::DisplayFailure(RevertAllOperation.Get());
 				}
 			}
 			else
@@ -439,9 +448,17 @@ void FUnityVersionControlMenu::SwitchToPartialWorkspaceClicked()
 	if (!Notification.IsInProgress())
 	{
 		// Ask the user before switching to Partial Workspace. It's not possible to switch back with local changes!
-		const FText DialogText(LOCTEXT("SourceControlMenu_AskSwitchToPartialWorkspace", "Switch to Gluon partial workspace?\n"
-			"Please note that, in order to switch back to a regular workspace you will need to undo all local changes."));
-		const EAppReturnType::Type Choice = FMessageDialog::Open(EAppMsgType::OkCancel, DialogText);
+		const FText SwitchToPartialQuestion(LOCTEXT("SourceControlMenu_AskSwitchToPartialWorkspace", "Switch to Gluon partial workspace?\n"
+			"Please note that in order to switch back to a regular workspace you will need to undo any local changes."));
+		const EAppReturnType::Type Choice = FMessageDialog::Open(
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+			EAppMsgCategory::Info,
+#endif
+			EAppMsgType::OkCancel, SwitchToPartialQuestion
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+			, LOCTEXT("SourceControlMenu_SwitchToPartialTitle", "Switch to Gluon partial workspace?")
+#endif
+		);
 		if (Choice == EAppReturnType::Ok)
 		{
 			// Launch a "SwitchToPartialWorkspace" Operation
@@ -456,7 +473,7 @@ void FUnityVersionControlMenu::SwitchToPartialWorkspaceClicked()
 			else
 			{
 				// Report failure with a notification
-				FNotification::DisplayFailure(SwitchOperation->GetName());
+				FNotification::DisplayFailure(SwitchOperation.Get());
 			}
 		}
 	}
@@ -553,15 +570,7 @@ void FUnityVersionControlMenu::OnSourceControlOperationComplete(const FSourceCon
 {
 	Notification.RemoveInProgress();
 
-	// Report result with a notification
-	if (InResult == ECommandResult::Succeeded)
-	{
-		FNotification::DisplaySuccess(InOperation->GetName());
-	}
-	else
-	{
-		FNotification::DisplayFailure(InOperation->GetName());
-	}
+	FNotification::DisplayResult(InOperation, InResult);
 }
 
 #if ENGINE_MAJOR_VERSION == 4

@@ -12,10 +12,10 @@
 #include "Misc/App.h"
 #include "Misc/FileHelper.h"
 #include "Styling/SlateTypes.h"
-#include "Widgets/Input/SEditableTextBox.h"
-#include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SCheckBox.h"
+#include "Widgets/Input/SEditableTextBox.h"
+#include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SSeparator.h"
 #include "Widgets/SBoxPanel.h"
@@ -384,7 +384,7 @@ void SUnityVersionControlSettings::Construct(const FArguments& InArgs)
 				.ToolTipText(LOCTEXT("PlasticInitWorkspace_Tooltip", "Create a new Unity Version Control repository and workspace and for the current project"))
 				.OnClicked(this, &SUnityVersionControlSettings::OnClickedCreatePlasticWorkspace)
 				.HAlign(HAlign_Center)
-				.ContentPadding(6)
+				.ContentPadding(6.0f)
 			]
 		]
 		// Button to add a 'ignore.conf' file on an existing Workspace

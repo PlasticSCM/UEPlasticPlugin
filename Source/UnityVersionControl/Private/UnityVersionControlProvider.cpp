@@ -11,6 +11,7 @@
 #include "UnityVersionControlShell.h"
 #include "UnityVersionControlState.h"
 #include "UnityVersionControlUtils.h"
+#include "UnityVersionControlVersions.h"
 #include "SUnityVersionControlSettings.h"
 
 #include "ISourceControlModule.h"
@@ -578,16 +579,23 @@ void FUnityVersionControlProvider::RegisterWorker(const FName& InName, const FGe
 
 void FUnityVersionControlProvider::OutputCommandMessages(const FUnityVersionControlCommand& InCommand) const
 {
+	// Note: the Perforce provider added a way to call OutputCommandMessages() from FPerforceSourceControlProvider::TryToDownloadFileFromBackgroundThread()
+	// see Commit 18dc0643 by paul chipchase, 05/17/2021 11:06 AM [CL 16346666 by paul chipchase in ue5-main branch]
+	// but we don't have this new API yet so we don't need this thread safety
+	check(IsInGameThread()); // On the game thread we can use FMessageLog
+
 	FMessageLog SourceControlLog("SourceControl");
 
 	for (const FString& ErrorMessage : InCommand.ErrorMessages)
 	{
-		SourceControlLog.Error(FText::FromString(ErrorMessage));
+		SourceControlLog.Error(FText::Format(LOCTEXT("OutputCommandMessagesFormatError", "Command: {0}, Error: {1}"),
+			FText::FromName(InCommand.Operation->GetName()), FText::FromString(ErrorMessage)));
 	}
 
 	for (const FString& InfoMessage : InCommand.InfoMessages)
 	{
-		SourceControlLog.Info(FText::FromString(InfoMessage));
+		SourceControlLog.Info(FText::Format(LOCTEXT("OutputCommandMessagesFormatInfo", "Command: {0}, Info: {1}"),
+			FText::FromName(InCommand.Operation->GetName()), FText::FromString(InfoMessage)));
 	}
 }
 
@@ -608,19 +616,31 @@ void FUnityVersionControlProvider::UpdateWorkspaceStatus(const class FUnityVersi
 		{
 			if (bPlasticAvailable)
 			{
-				if (PlasticScmVersion < UnityVersionControlUtils::GetOldestSupportedPlasticScmVersion())
+				if (PlasticScmVersion < UnityVersionControlVersions::OldestSupported)
 				{
 					FFormatNamedArguments Args;
 					Args.Add(TEXT("PlasticScmVersion"), FText::FromString(PlasticScmVersion.String));
-					Args.Add(TEXT("OldestSupportedPlasticScmVersion"), FText::FromString(UnityVersionControlUtils::GetOldestSupportedPlasticScmVersion().String));
-					const FText UnsuportedVersionWarning = FText::Format(LOCTEXT("Plastic_UnsuportedVersion", "Unity Version Control {PlasticScmVersion} is not supported anymore by this plugin.\nUnity Version Control {OldestSupportedPlasticScmVersion} or a more recent version is required.\nPlease upgrade to the latest version."), Args);
-					FMessageLog("SourceControl").Warning(UnsuportedVersionWarning);
-					FMessageDialog::Open(EAppMsgType::Ok, UnsuportedVersionWarning);
+					Args.Add(TEXT("OldestSupportedPlasticScmVersion"), FText::FromString(UnityVersionControlVersions::OldestSupported.String));
+					const FText UnsupportedVersionWarning = FText::Format(LOCTEXT("Plastic_UnsupportedVersion", "Unity Version Control {PlasticScmVersion} is not supported anymore by this plugin.\nUnity Version Control {OldestSupportedPlasticScmVersion} or a more recent version is required.\nPlease upgrade to the latest version."), Args);
+					FMessageLog("SourceControl").Warning(UnsupportedVersionWarning);
+					FMessageDialog::Open(
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+						EAppMsgCategory::Warning,
+#endif
+						EAppMsgType::Ok, UnsupportedVersionWarning
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+						, LOCTEXT("Plastic_UnsuportedVersionTitle", "Unsupported version!")
+#endif
+					);
 				}
 			}
 			else if (InCommand.ErrorMessages.Num() > 0)
 			{
-				FMessageDialog::Open(EAppMsgType::Ok, FText::FromString(InCommand.ErrorMessages[0]));
+				FMessageDialog::Open(
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+					EAppMsgCategory::Error,
+#endif
+					EAppMsgType::Ok, FText::FromString(InCommand.ErrorMessages[0]));
 			}
 		}
 
@@ -696,8 +716,7 @@ void FUnityVersionControlProvider::Tick()
 			}
 
 			// run the completion delegate callback if we have one bound
-			ECommandResult::Type Result = Command.bCommandSuccessful ? ECommandResult::Succeeded : ECommandResult::Failed;
-			Command.OperationCompleteDelegate.ExecuteIfBound(Command.Operation, Result);
+			Command.ReturnResults();
 
 			// commands that are left in the array during a tick need to be deleted
 			if (Command.bAutoDelete)
@@ -844,7 +863,15 @@ ECommandResult::Type FUnityVersionControlProvider::IssueCommand(FUnityVersionCon
 	}
 	else
 	{
-		return ECommandResult::Failed;
+		// NOTE: the Perforce & Subversion providers implement this, but looking at Git history of the code I think it has never been used in UE4
+		// If we need to support this, we will need to know the use cases in order to test it
+		FText Message(LOCTEXT("NoSCCThreads", "There are no threads available to process the revision control command."));
+
+		FMessageLog("SourceControl").Error(Message);
+		InCommand.bCommandSuccessful = false;
+		InCommand.Operation->AddErrorMessge(Message);
+
+		return InCommand.ReturnResults();
 	}
 }
 

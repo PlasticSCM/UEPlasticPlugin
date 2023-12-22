@@ -11,8 +11,11 @@
 #include "EditorStyleSet.h"
 #endif
 #include "Input/Reply.h"
+#include "Styling/SlateTypes.h"
+#include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
+#include "Widgets/SBoxPanel.h"
 
 #define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
 
@@ -35,12 +38,12 @@ void SUnityVersionControlCreateBranch::Construct(const FArguments& InArgs)
 			.FillWidth(1.0f)
 			[
 				SNew(STextBlock)
-				.Text(FText::Format(LOCTEXT("PlasticCreateBrancheDetails", "Create a new child branch from last changeset on br:{0}"), FText::FromString(ParentBranchName)))
+				.Text(FText::Format(LOCTEXT("PlasticCreateBrancheDetails", "Create a new child branch from last changeset on branch {0}"), FText::FromString(ParentBranchName)))
 			]
 		]
 		+SVerticalBox::Slot()
 		.AutoHeight()
-		.Padding(FMargin(5.0f))
+		.Padding(5.0f)
 		.VAlign(VAlign_Center)
 		[
 			SNew(SHorizontalBox)
@@ -56,9 +59,17 @@ void SUnityVersionControlCreateBranch::Construct(const FArguments& InArgs)
 			[
 				SAssignNew(BranchNameTextBox, SEditableTextBox)
 				.HintText(LOCTEXT("PlasticCreateBrancheNameHint", "Name of the new branch"))
-				.OnTextChanged_Lambda([this](const FText& InExpressionText)
+				.OnTextChanged_Lambda([this](const FText& InText)
 				{
-					NewBranchName = InExpressionText.ToString();
+					NewBranchName = InText.ToString();
+				})
+				.OnTextCommitted_Lambda([this](const FText& InText, ETextCommit::Type TextCommitType)
+				{
+					NewBranchName = InText.ToString();
+					if (TextCommitType == ETextCommit::OnEnter)
+					{
+						CreateClicked();
+					}
 				})
 			]
 		]
@@ -79,15 +90,15 @@ void SUnityVersionControlCreateBranch::Construct(const FArguments& InArgs)
 			.FillWidth(6.0f)
 			[
 				SNew(SBox)
-				.MinDesiredHeight(120)
-				.WidthOverride(520)
+				.MinDesiredHeight(120.0f)
+				.WidthOverride(520.0f)
 				[
 					SNew(SMultiLineEditableTextBox)
 					.AutoWrapText(true)
 					.HintText(LOCTEXT("PlasticCreateBrancheCommentHing", "Comments for the new branch"))
-					.OnTextCommitted_Lambda([this](const FText& InExpressionText, ETextCommit::Type)
+					.OnTextCommitted_Lambda([this](const FText& InText, ETextCommit::Type TextCommitType)
 					{
-						NewBranchComment = InExpressionText.ToString();
+						NewBranchComment = InText.ToString();
 					})
 				]
 			]
@@ -119,7 +130,7 @@ void SUnityVersionControlCreateBranch::Construct(const FArguments& InArgs)
 		[
 			SNew(SHorizontalBox)
 			+SHorizontalBox::Slot()
-			.FillWidth(1.0f)
+			.AutoWidth()
 			[
 				SNew(SButton)
 				.HAlign(HAlign_Center)
@@ -129,12 +140,12 @@ void SUnityVersionControlCreateBranch::Construct(const FArguments& InArgs)
 				.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
 #endif
 				.Text(LOCTEXT("Create", "Create"))
-				.IsEnabled(this, &SUnityVersionControlCreateBranch::IsNewBranchNameValid)
+				.IsEnabled(this, &SUnityVersionControlCreateBranch::CanCreateBranch)
 				.ToolTipText(this, &SUnityVersionControlCreateBranch::CreateButtonTooltip)
 				.OnClicked(this, &SUnityVersionControlCreateBranch::CreateClicked)
 			]
 			+SHorizontalBox::Slot()
-			.FillWidth(1.0f)
+			.AutoWidth()
 			[
 				SNew(SButton)
 				.HAlign(HAlign_Center)
@@ -152,27 +163,20 @@ void SUnityVersionControlCreateBranch::Construct(const FArguments& InArgs)
 	ParentWindow.Pin()->SetWidgetToFocusOnActivate(BranchNameTextBox);
 }
 
-bool SUnityVersionControlCreateBranch::IsNewBranchNameValid() const
+inline void SUnityVersionControlCreateBranch::OnCheckedSwitchWorkspace(ECheckBoxState InState)
 {
-	// Branch name cannot contain any of the following characters:
-	// Note: tabs are technically not forbidden in branch names, but having one at the end doesn't work as expected
-	// (it is trimmed at creation, so the switch to the new branch fails)
-	static const FString BranchNameInvalidChars(TEXT("@#/:\"?'\n\r\t"));
+	bSwitchWorkspace = (InState == ECheckBoxState::Checked);
+}
 
+
+bool SUnityVersionControlCreateBranch::CanCreateBranch() const
+{
 	if (NewBranchName.IsEmpty())
 	{
 		return false;
 	}
 
-	for (TCHAR Char : NewBranchName)
-	{
-		if (BranchNameInvalidChars.Contains(&Char, ESearchCase::CaseSensitive))
-		{
-			return false;
-		}
-	}
-
-	return true;
+	return SUnityVersionControlBranchesWidget::IsBranchNameValid(NewBranchName);
 }
 
 FText SUnityVersionControlCreateBranch::CreateButtonTooltip() const
@@ -182,7 +186,7 @@ FText SUnityVersionControlCreateBranch::CreateButtonTooltip() const
 		return LOCTEXT("CreateEmpty_Tooltip", "Enter a name for the new branch.");
 	}
 
-	if (!IsNewBranchNameValid())
+	if (!SUnityVersionControlBranchesWidget::IsBranchNameValid(NewBranchName))
 	{
 		return LOCTEXT("CreateInvalid_Tooltip", "Branch name cannot contain any of the following characters: @#/:\"?'\\n\\r\\t");
 	}

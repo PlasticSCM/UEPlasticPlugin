@@ -37,6 +37,30 @@ const FDateTime& FUnityVersionControlChangelistState::GetTimeStamp() const
 	return TimeStamp;
 }
 
+#if ENGINE_MINOR_VERSION >= 4
+
+const TArray<FSourceControlStateRef> FUnityVersionControlChangelistState::GetFilesStates() const
+{
+	return Files;
+}
+
+int32 FUnityVersionControlChangelistState::GetFilesStatesNum() const
+{
+	return Files.Num();
+}
+
+const TArray<FSourceControlStateRef> FUnityVersionControlChangelistState::GetShelvedFilesStates() const
+{
+	return ShelvedFiles;
+}
+
+int32 FUnityVersionControlChangelistState::GetShelvedFilesStatesNum() const
+{
+	return ShelvedFiles.Num();
+}
+
+#else // ENGINE_MINOR_VERSION < 4
+
 const TArray<FSourceControlStateRef>& FUnityVersionControlChangelistState::GetFilesStates() const
 {
 	return Files;
@@ -46,6 +70,8 @@ const TArray<FSourceControlStateRef>& FUnityVersionControlChangelistState::GetSh
 {
 	return ShelvedFiles;
 }
+
+#endif // ENGINE_MINOR_VERSION
 
 FSourceControlChangelistRef FUnityVersionControlChangelistState::GetChangelist() const
 {

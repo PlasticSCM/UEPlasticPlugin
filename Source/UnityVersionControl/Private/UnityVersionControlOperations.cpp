@@ -6,6 +6,7 @@
 #include "UnityVersionControlBranch.h"
 #include "UnityVersionControlCommand.h"
 #include "UnityVersionControlModule.h"
+#include "UnityVersionControlParsers.h"
 #include "UnityVersionControlProvider.h"
 #include "UnityVersionControlSettings.h"
 #include "UnityVersionControlShell.h"
@@ -49,7 +50,10 @@ void IUnityVersionControlWorker::RegisterWorkers(FUnityVersionControlProvider& U
 	UnityVersionControlProvider.RegisterWorker("Unlock", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnlockWorker>));
 	UnityVersionControlProvider.RegisterWorker("GetBranches", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetBranchesWorker>));
 	UnityVersionControlProvider.RegisterWorker("SwitchToBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToBranchWorker>));
+	UnityVersionControlProvider.RegisterWorker("Merge", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticMergeBranchWorker>));
 	UnityVersionControlProvider.RegisterWorker("CreateBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticCreateBranchWorker>));
+	UnityVersionControlProvider.RegisterWorker("RenameBranch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticRenameBranchWorker>));
+	UnityVersionControlProvider.RegisterWorker("DeleteBranches", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteBranchesWorker>));
 	UnityVersionControlProvider.RegisterWorker("MakeWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticMakeWorkspaceWorker>));
 	UnityVersionControlProvider.RegisterWorker("Sync", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
 	UnityVersionControlProvider.RegisterWorker("SyncAll", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
@@ -154,12 +158,22 @@ FText FPlasticGetBranches::GetInProgressString() const
 
 FName FPlasticSwitchToBranch::GetName() const
 {
-	return "SwitchToBranch";
+	return "Switch";
 }
 
 FText FPlasticSwitchToBranch::GetInProgressString() const
 {
 	return LOCTEXT("SourceControl_SwitchToBranch", "Switching the workspace to another branch...");
+}
+
+FName FPlasticMergeBranch::GetName() const
+{
+	return "Merge";
+}
+
+FText FPlasticMergeBranch::GetInProgressString() const
+{
+	return LOCTEXT("SourceControl_MergeBranch", "Merging branch to the current one...");
 }
 
 FName FPlasticCreateBranch::GetName() const
@@ -169,7 +183,28 @@ FName FPlasticCreateBranch::GetName() const
 
 FText FPlasticCreateBranch::GetInProgressString() const
 {
-	return LOCTEXT("SourceControl_Branch", "Creating new child branch...");
+	return LOCTEXT("SourceControl_CreateBranch", "Creating new child branch...");
+}
+
+
+FName FPlasticRenameBranch::GetName() const
+{
+	return "RenameBranch";
+}
+
+FText FPlasticRenameBranch::GetInProgressString() const
+{
+	return LOCTEXT("SourceControl_RenameBranch", "Renaming a branch...");
+}
+
+FName FPlasticDeleteBranches::GetName() const
+{
+	return "DeleteBranches";
+}
+
+FText FPlasticDeleteBranches::GetInProgressString() const
+{
+	return LOCTEXT("SourceControl_DeleteBranches", "Deleting branch(es)...");
 }
 
 
@@ -363,32 +398,6 @@ TArray<FString> FileNamesFromFileStates(const TArray<FSourceControlStateRef>& In
 
 #endif
 
-/// Parse checkin result, usually looking like "Created changeset cs:8@br:/main@MyProject@SRombauts@cloud (mount:'/')"
-static FText ParseCheckInResults(const TArray<FString>& InResults)
-{
-	if (InResults.Num() > 0)
-	{
-		static const FString ChangesetPrefix(TEXT("Created changeset "));
-		if (InResults.Last().StartsWith(ChangesetPrefix))
-		{
-			FString ChangesetString;
-			static const FString BranchPrefix(TEXT("@br:"));
-			const int32 BranchIndex = InResults.Last().Find(BranchPrefix, ESearchCase::CaseSensitive);
-			if (BranchIndex > INDEX_NONE)
-			{
-				ChangesetString = InResults.Last().Mid(ChangesetPrefix.Len(), BranchIndex - ChangesetPrefix.Len());
-			}
-			return FText::Format(LOCTEXT("SubmitMessage", "Submitted changeset {0}"), FText::FromString(ChangesetString));
-		}
-		else
-		{
-			return FText::FromString(InResults.Last());
-		}
-	}
-	return FText();
-}
-
-
 TArray<FString> GetFilesFromCommand(FUnityVersionControlProvider& UnityVersionControlProvider, FUnityVersionControlCommand& InCommand)
 {
 	TArray<FString> Files;
@@ -460,7 +469,7 @@ bool FPlasticCheckInWorker::Execute(FUnityVersionControlCommand& InCommand)
 			}
 			if (InCommand.bCommandSuccessful)
 			{
-				Operation->SetSuccessMessage(ParseCheckInResults(InCommand.InfoMessages));
+				Operation->SetSuccessMessage(UnityVersionControlParsers::ParseCheckInResults(InCommand.InfoMessages));
 				UE_LOG(LogSourceControl, Log, TEXT("CheckIn successful"));
 			}
 
@@ -1086,7 +1095,7 @@ bool FPlasticGetBranchesWorker::UpdateStates()
 
 FName FPlasticSwitchToBranchWorker::GetName() const
 {
-	return "SwitchToBranch";
+	return "Switch";
 }
 
 bool FPlasticSwitchToBranchWorker::Execute(FUnityVersionControlCommand& InCommand)
@@ -1096,12 +1105,54 @@ bool FPlasticSwitchToBranchWorker::Execute(FUnityVersionControlCommand& InComman
 	check(InCommand.Operation->GetName() == GetName());
 	TSharedRef<FPlasticSwitchToBranch, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticSwitchToBranch>(InCommand.Operation);
 
-	return UnityVersionControlUtils::RunSwitchToBranch(Operation->BranchName, Operation->UpdatedFiles, InCommand.ErrorMessages);
+	InCommand.bCommandSuccessful = UnityVersionControlUtils::RunSwitchToBranch(Operation->BranchName, Operation->UpdatedFiles, InCommand.ErrorMessages);
+
+	// now update the status of the updated files
+	if (Operation->UpdatedFiles.Num())
+	{
+		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunUpdateStatus(Operation->UpdatedFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
+	}
+
+	return InCommand.bCommandSuccessful;
 }
 
 bool FPlasticSwitchToBranchWorker::UpdateStates()
 {
-	return false;
+	return UnityVersionControlUtils::UpdateCachedStates(MoveTemp(States));
+}
+
+
+FName FPlasticMergeBranchWorker::GetName() const
+{
+	return "Merge";
+}
+
+bool FPlasticMergeBranchWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticMergeBranchWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticMergeBranch, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticMergeBranch>(InCommand.Operation);
+
+	InCommand.bCommandSuccessful = UnityVersionControlUtils::RunMergeBranch(Operation->BranchName, Operation->UpdatedFiles, InCommand.ErrorMessages);
+
+	// now update the status of the updated files
+	if (Operation->UpdatedFiles.Num())
+	{
+		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunUpdateStatus(Operation->UpdatedFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
+	}
+
+	return InCommand.bCommandSuccessful;
+}
+
+bool FPlasticMergeBranchWorker::UpdateStates()
+{
+#if ENGINE_MAJOR_VERSION == 5
+	// Update the Default changelist.
+	UpdateChangelistState(GetProvider(), FUnityVersionControlChangelist::DefaultChangelist, States);
+#endif
+
+	return UnityVersionControlUtils::UpdateCachedStates(MoveTemp(States));
 }
 
 
@@ -1121,6 +1172,48 @@ bool FPlasticCreateBranchWorker::Execute(FUnityVersionControlCommand& InCommand)
 }
 
 bool FPlasticCreateBranchWorker::UpdateStates()
+{
+	return false;
+}
+
+
+FName FPlasticRenameBranchWorker::GetName() const
+{
+	return "RenameBranch";
+}
+
+bool FPlasticRenameBranchWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticRenameBranchWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticRenameBranch, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticRenameBranch>(InCommand.Operation);
+
+	return UnityVersionControlUtils::RunRenameBranch(Operation->OldName, Operation->NewName, InCommand.ErrorMessages);
+}
+
+bool FPlasticRenameBranchWorker::UpdateStates()
+{
+	return false;
+}
+
+
+FName FPlasticDeleteBranchesWorker::GetName() const
+{
+	return "DeleteBranches";
+}
+
+bool FPlasticDeleteBranchesWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticDeleteBranchesWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticDeleteBranches, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticDeleteBranches>(InCommand.Operation);
+
+	return UnityVersionControlUtils::RunDeleteBranches(Operation->BranchNames, InCommand.ErrorMessages);
+}
+
+bool FPlasticDeleteBranchesWorker::UpdateStates()
 {
 	return false;
 }

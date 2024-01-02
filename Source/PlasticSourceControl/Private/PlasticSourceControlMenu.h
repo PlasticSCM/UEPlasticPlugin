@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #pragma once
 

@@ -20,15 +20,8 @@
 #include "ToolMenus.h"
 #include "ToolMenuContext.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 #include "Misc/ComparisonUtility.h"
-#endif
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/SBoxPanel.h"
@@ -60,11 +53,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 		.AutoHeight()
 		[
 			SNew(SBorder)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 			.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
-#else
-			.BorderImage(FEditorStyle::GetBrush("DetailsView.CategoryBottom"))
-#endif
 			.Padding(4.0f)
 			[
 				SNew(SHorizontalBox)
@@ -138,11 +127,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 
 TSharedRef<SWidget> SPlasticSourceControlBranchesWidget::CreateToolBar()
 {
-#if ENGINE_MAJOR_VERSION >= 5
 	FSlimHorizontalToolBarBuilder ToolBarBuilder(nullptr, FMultiBoxCustomization::None);
-#else
-	FToolBarBuilder ToolBarBuilder(nullptr, FMultiBoxCustomization::None);
-#endif
 
 	ToolBarBuilder.AddToolBarButton(
 		FUIAction(
@@ -150,11 +135,7 @@ TSharedRef<SWidget> SPlasticSourceControlBranchesWidget::CreateToolBar()
 		NAME_None,
 		LOCTEXT("SourceControl_RefreshButton", "Refresh"),
 		LOCTEXT("SourceControl_RefreshButton_Tooltip", "Refreshes branches from revision control provider."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Refresh"));
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Refresh"));
-#endif
 
 	return ToolBarBuilder.MakeWidget();
 }
@@ -404,11 +385,7 @@ void SPlasticSourceControlBranchesWidget::SortBranchView()
 
 	auto CompareNames = [](const FPlasticSourceControlBranch* Lhs, const FPlasticSourceControlBranch* Rhs)
 	{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		return UE::ComparisonUtility::CompareNaturalOrder(*Lhs->Name, *Rhs->Name);
-#else
-		return FCString::Stricmp(*Lhs->Name, *Rhs->Name);
-#endif
 	};
 
 	auto CompareRepository = [](const FPlasticSourceControlBranch* Lhs, const FPlasticSourceControlBranch* Rhs)
@@ -754,13 +731,9 @@ void SPlasticSourceControlBranchesWidget::OnMergeBranchClicked(FString InBranchN
 {
 	const FText MergeBranchQuestion = FText::Format(LOCTEXT("MergeBranchDialog", "Merge branch {0} into the current branch {1}?"), FText::FromString(InBranchName), FText::FromString(CurrentBranchName));
 	const EAppReturnType::Type Choice = FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		EAppMsgCategory::Info,
-#endif
 		EAppMsgType::YesNo, MergeBranchQuestion
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		, LOCTEXT("MergeBranchTitle", "Merge Branch?")
-#endif
 	);
 	if (Choice == EAppReturnType::Yes)
 	{
@@ -1096,13 +1069,9 @@ FReply SPlasticSourceControlBranchesWidget::OnKeyDown(const FGeometry& MyGeometr
 			// Note: this action require a confirmation dialog (while the Delete below already have one in OnDeleteBranchesClicked()).
 			const FText SwitchToBranchQuestion = FText::Format(LOCTEXT("SwitchToBranchDialog", "Switch workspace to branch {0}?"), FText::FromString(SelectedBranch));
 			const EAppReturnType::Type Choice = FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 				EAppMsgCategory::Info,
-#endif
 				EAppMsgType::YesNo, SwitchToBranchQuestion
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 				, LOCTEXT("SwitchToBranchTitle", "Switch Branch?")
-#endif
 			);
 			if (Choice == EAppReturnType::Yes)
 			{

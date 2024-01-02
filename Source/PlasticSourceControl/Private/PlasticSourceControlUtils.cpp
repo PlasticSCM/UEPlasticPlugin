@@ -19,10 +19,7 @@
 #include "SoftwareVersion.h"
 #include "ScopedTempFile.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5
 #include "PlasticSourceControlChangelistState.h"
-#endif
 
 namespace PlasticSourceControlUtils
 {
@@ -484,18 +481,12 @@ static bool RunCheckMergeStatus(const TArray<FString>& InFiles, TArray<FString>&
 							{
 								UE_LOG(LogSourceControl, Verbose, TEXT("MergeConflict '%s' found Base cs:%s From cs:%s"), *MergeConflict.Filename, *MergeConflict.BaseChangeset, *MergeConflict.SourceChangeset);
 								State.WorkspaceState = EWorkspaceState::Conflicted;
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 								State.PendingResolveInfo = {
 									MergeConflict.Filename,
 									MergeConflict.Filename,
 									MergeConflict.SourceChangeset,
 									MergeConflict.BaseChangeset
 								};
-#else
-								State.PendingMergeFilename = MergeConflict.Filename;
-								State.PendingMergeBaseChangeset = FCString::Atoi(*MergeConflict.BaseChangeset);
-								State.PendingMergeSourceChangeset = FCString::Atoi(*MergeConflict.SourceChangeset);
-#endif
 								State.PendingMergeParameters = PendingMergeParameters;
 								break;
 							}
@@ -790,8 +781,6 @@ bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace,
 	return bResult;
 }
 
-#if ENGINE_MAJOR_VERSION == 5
-
 // Run a Plastic "status --changelist --xml" and parse its XML result.
 bool RunGetChangelists(TArray<FPlasticSourceControlChangelistState>& OutChangelistsStates, TArray<TArray<FPlasticSourceControlState>>& OutCLFilesStates, TArray<FString>& OutErrorMessages)
 {
@@ -963,8 +952,6 @@ bool RunGetShelve(const int32 InShelveId, FString& OutComment, FDateTime& OutDat
 
 	return bCommandSuccessful;
 }
-
-#endif
 
 bool RunGetBranches(const FDateTime& InFromDate, TArray<FPlasticSourceControlBranchRef>& OutBranches, TArray<FString>& OutErrorMessages)
 {

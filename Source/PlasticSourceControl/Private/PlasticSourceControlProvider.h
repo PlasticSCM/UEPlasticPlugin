@@ -10,12 +10,8 @@
 #include "PlasticSourceControlSettings.h"
 #include "SoftwareVersion.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-
-#if ENGINE_MAJOR_VERSION == 5
 #include "ISourceControlChangelistState.h"
 #include "PlasticSourceControlChangelist.h"
-#endif
 
 DECLARE_DELEGATE_RetVal_OneParam(FPlasticSourceControlWorkerRef, FGetPlasticSourceControlWorker, FPlasticSourceControlProvider&)
 
@@ -30,9 +26,7 @@ public:
 	virtual void Init(bool bForceConnection = true) override;
 	virtual void Close() override;
 	virtual FText GetStatusText() const override;
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-	virtual TMap<EStatus, FString> GetStatus() const override; /* NOTE: added in UE5.3, requires the new EStatus */
-#endif
+	virtual TMap<EStatus, FString> GetStatus() const override;
 	virtual bool IsEnabled() const override;
 	virtual bool IsAvailable() const override;
 	virtual const FName& GetName(void) const override;
@@ -40,34 +34,26 @@ public:
 	virtual void RegisterStateBranches(const TArray<FString>& BranchNames, const FString& ContentRoot) override {}
 	virtual int32 GetStateBranchIndex(const FString& InBranchName) const override { return INDEX_NONE; }
 	virtual ECommandResult::Type GetState(const TArray<FString>& InFiles, TArray<FSourceControlStateRef>& OutState, EStateCacheUsage::Type InStateCacheUsage) override;
-#if ENGINE_MAJOR_VERSION == 5
 	virtual ECommandResult::Type GetState(const TArray<FSourceControlChangelistRef>& InChangelists, TArray<FSourceControlChangelistStateRef>& OutState, EStateCacheUsage::Type InStateCacheUsage) override;
-#endif
 	virtual TArray<FSourceControlStateRef> GetCachedStateByPredicate(TFunctionRef<bool(const FSourceControlStateRef&)> Predicate) const override;
 	virtual FDelegateHandle RegisterSourceControlStateChanged_Handle(const FSourceControlStateChanged::FDelegate& SourceControlStateChanged) override;
 	virtual void UnregisterSourceControlStateChanged_Handle(FDelegateHandle Handle) override;
-#if ENGINE_MAJOR_VERSION == 4
-	virtual ECommandResult::Type Execute(const FSourceControlOperationRef& InOperation, const TArray<FString>& InFiles, EConcurrency::Type InConcurrency = EConcurrency::Synchronous, const FSourceControlOperationComplete& InOperationCompleteDelegate = FSourceControlOperationComplete() ) override;
-#elif ENGINE_MAJOR_VERSION == 5
 	virtual ECommandResult::Type Execute(const FSourceControlOperationRef& InOperation, FSourceControlChangelistPtr InChangelist, const TArray<FString>& InFiles, EConcurrency::Type InConcurrency = EConcurrency::Synchronous, const FSourceControlOperationComplete& InOperationCompleteDelegate = FSourceControlOperationComplete() ) override;
-#endif
-	virtual bool CanExecuteOperation(const FSourceControlOperationRef& InOperation) const; /* override	NOTE: added in UE5.3 */
+	virtual bool CanExecuteOperation(const FSourceControlOperationRef& InOperation) const override;
 	virtual bool CanCancelOperation(const FSourceControlOperationRef& InOperation) const override;
 	virtual void CancelOperation(const FSourceControlOperationRef& InOperation) override;
 	virtual bool UsesLocalReadOnlyState() const override;
 	virtual bool UsesChangelists() const override;
-	virtual bool UsesUncontrolledChangelists() const; /* override	NOTE: added in UE5.2 */
+	virtual bool UsesUncontrolledChangelists() const override;
 	virtual bool UsesCheckout() const override;
-	virtual bool UsesFileRevisions() const; /* override				NOTE: added in UE5.1 */
-	virtual bool UsesSnapshots() const; /* override					NOTE: added in UE5.2 */
-	virtual bool AllowsDiffAgainstDepot() const; /* override		NOTE: added in UE5.2 */
-	virtual TOptional<bool> IsAtLatestRevision() const; /* override	NOTE: added in UE5.1 */
-	virtual TOptional<int> GetNumLocalChanges() const; /* override	NOTE: added in UE5.1 */
+	virtual bool UsesFileRevisions() const override;
+	virtual bool UsesSnapshots() const override;
+	virtual bool AllowsDiffAgainstDepot() const override;
+	virtual TOptional<bool> IsAtLatestRevision() const override;
+	virtual TOptional<int> GetNumLocalChanges() const override;
 	virtual void Tick() override;
-	virtual TArray< TSharedRef<class ISourceControlLabel> > GetLabels(const FString& InMatchingSpec) const override;
-#if ENGINE_MAJOR_VERSION == 5
+	virtual TArray<TSharedRef<class ISourceControlLabel>> GetLabels(const FString& InMatchingSpec) const override;
 	virtual TArray<FSourceControlChangelistRef> GetChangelists(EStateCacheUsage::Type InStateCacheUsage) override;
-#endif
 #if SOURCE_CONTROL_WITH_SLATE
 	virtual TSharedRef<class SWidget> MakeSettingsWidget() const override;
 #endif
@@ -167,10 +153,8 @@ public:
 	/** Helper function used to update state cache */
 	TSharedRef<class FPlasticSourceControlState, ESPMode::ThreadSafe> GetStateInternal(const FString& InFilename);
 
-#if ENGINE_MAJOR_VERSION == 5
 	/** Helper function used to update changelists state cache */
 	TSharedRef<class FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> GetStateInternal(const FPlasticSourceControlChangelist& InChangelist);
-#endif
 
 	/**
 	 * Register a worker with the provider.
@@ -181,13 +165,11 @@ public:
 	/** Remove a named file from the state cache */
 	bool RemoveFileFromCache(const FString& Filename);
 
-#if ENGINE_MAJOR_VERSION == 5
 	/** Remove a changelist from the state cache */
 	bool RemoveChangelistFromCache(const FPlasticSourceControlChangelist& Changelist);
 
 	/** Returns a list of changelists from the cache based on a given predicate */
 	TArray<FSourceControlChangelistStateRef> GetCachedStateByPredicate(TFunctionRef<bool(const FSourceControlChangelistStateRef&)> Predicate) const;
-#endif
 
 	/** Access the Plastic source control settings */
 	FPlasticSourceControlSettings& AccessSettings()
@@ -239,11 +221,7 @@ private:
 	void UpdateWorkspaceStatus(const class FPlasticSourceControlCommand& InCommand);
 
 	/** Called after a package has been saved to disk, to update the source control cache */
-#if ENGINE_MAJOR_VERSION == 4
-	void HandlePackageSaved(const FString& InPackageFilename, UObject* Outer);
-#else
 	void HandlePackageSaved(const FString& InPackageFilename, UPackage* InPackage, FObjectPostSaveContext InObjectSaveContext);
-#endif
 
 	/** Version of the Unity Version Control executable used */
 	FSoftwareVersion PlasticScmVersion;
@@ -274,9 +252,7 @@ private:
 
 	/** State caches */
 	TMap<FString, TSharedRef<class FPlasticSourceControlState, ESPMode::ThreadSafe> > StateCache;
-#if ENGINE_MAJOR_VERSION == 5
 	TMap<FPlasticSourceControlChangelist, TSharedRef<class FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> > ChangelistsStateCache;
-#endif
 
 	/** The currently registered source control operations */
 	TMap<FName, FGetPlasticSourceControlWorker> WorkersMap;

@@ -4,12 +4,7 @@
 
 #include "SPlasticSourceControlBranchesWidget.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 #include "Input/Reply.h"
 #include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SEditableTextBox.h"
@@ -76,11 +71,7 @@ void SPlasticSourceControlDeleteBranches::Construct(const FArguments& InArgs)
 			[
 				SAssignNew(DeleteButtonPtr, SButton)
 				.HAlign(HAlign_Center)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 				.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
-#else
-				.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
-#endif
 				.Text(LOCTEXT("Delete", "Delete"))
 				.OnClicked(this, &SPlasticSourceControlDeleteBranches::DeleteClicked)
 			]
@@ -89,11 +80,7 @@ void SPlasticSourceControlDeleteBranches::Construct(const FArguments& InArgs)
 			[
 				SNew(SButton)
 				.HAlign(HAlign_Center)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 				.ContentPadding(FAppStyle::GetMargin("StandardDialog.ContentPadding"))
-#else
-				.ContentPadding(FEditorStyle::GetMargin("StandardDialog.ContentPadding"))
-#endif
 				.Text(LOCTEXT("Cancel", "Cancel"))
 				.OnClicked(this, &SPlasticSourceControlDeleteBranches::CancelClicked)
 			]

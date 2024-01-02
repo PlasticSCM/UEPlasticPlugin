@@ -25,33 +25,6 @@
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 
 
-#if ENGINE_MAJOR_VERSION == 4
-
-// Needed to SetHandleInformation() on WritePipe for input (opposite of ReadPipe, for output) (idem FInteractiveProcess)
-// Note: this has been implemented in Unreal Engine 5.0 in January 2022
-static FORCEINLINE bool CreatePipeWrite(void*& ReadPipe, void*& WritePipe)
-{
-#if PLATFORM_WINDOWS
-	SECURITY_ATTRIBUTES Attr = { sizeof(SECURITY_ATTRIBUTES), NULL, true };
-
-	if (!::CreatePipe(&ReadPipe, &WritePipe, &Attr, 0))
-	{
-		return false;
-	}
-
-	if (!::SetHandleInformation(WritePipe, HANDLE_FLAG_INHERIT, 0))
-	{
-		return false;
-	}
-
-	return true;
-#else
-	return FPlatformProcess::CreatePipe(ReadPipe, WritePipe);
-#endif // PLATFORM_WINDOWS
-}
-
-#endif
-
 namespace PlasticSourceControlShell
 {
 static const TCHAR* ShellCommandResultText = TEXT("CommandResult ");
@@ -104,14 +77,8 @@ static bool _StartBackgroundPlasticShell(const FString& InPathToPlasticBinary, c
 
 	const double StartTimestamp = FPlatformTime::Seconds();
 
-#if ENGINE_MAJOR_VERSION == 4
-	verify(FPlatformProcess::CreatePipe(ShellOutputPipeRead, ShellOutputPipeWrite));		// For reading outputs from cm shell child process
-	verify(             CreatePipeWrite(ShellInputPipeRead, ShellInputPipeWrite));			// For writing commands to cm shell child process NOLINT
-#elif ENGINE_MAJOR_VERSION == 5
 	verify(FPlatformProcess::CreatePipe(ShellOutputPipeRead, ShellOutputPipeWrite, false));	// For reading outputs from cm shell child process
 	verify(FPlatformProcess::CreatePipe(ShellInputPipeRead, ShellInputPipeWrite, true));	// For writing commands to cm shell child process
-#endif
-
 
 #if PLATFORM_WINDOWS
 	ShellProcessHandle = FPlatformProcess::CreateProc(*InPathToPlasticBinary, *FullCommand, bLaunchDetached, bLaunchHidden, bLaunchReallyHidden, nullptr, 0, *InWorkingDirectory, ShellOutputPipeWrite, ShellInputPipeRead);

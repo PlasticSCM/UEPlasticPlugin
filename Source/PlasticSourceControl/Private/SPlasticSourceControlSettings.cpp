@@ -20,22 +20,13 @@
 #include "Widgets/Layout/SSeparator.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 
 #define LOCTEXT_NAMESPACE "SPlasticSourceControlSettings"
 
 void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 {
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	const FSlateFontInfo Font = FAppStyle::GetFontStyle(TEXT("SourceControl.LoginWindow.Font"));
-#else
-	const FSlateFontInfo Font = FEditorStyle::GetFontStyle(TEXT("SourceControl.LoginWindow.Font"));
-#endif
 
 	bAutoCreateIgnoreFile = CanAutoCreateIgnoreFile();
 	WorkspaceParams.bAutoInitialCommit = true;
@@ -51,12 +42,6 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
-#if ENGINE_MAJOR_VERSION == 4
-	SNew(SBorder)
-	.BorderImage(FEditorStyle::GetBrush("DetailsView.CategoryBottom"))
-	.Padding(FMargin(0.0f, 3.0f, 0.0f, 0.0f))
-	[
-#endif
 		SNew(SVerticalBox)
 		// Versions (Plugin & Unity Version Control) useful eg to help diagnose issues from screenshots
 		+SVerticalBox::Slot()
@@ -359,11 +344,7 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 			.OnCheckStateChanged(this, &SPlasticSourceControlSettings::OnCheckedEnableVerboseLogs)
 			[
 				SNew(STextBlock)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 				.Text(LOCTEXT("EnableVerboseLogs", "Enable Revision Control Verbose logs"))
-#else
-				.Text(LOCTEXT("EnableVerboseLogs", "Enable Source Control Verbose logs"))
-#endif
 				.Font(Font)
 			]
 		]
@@ -405,9 +386,6 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 				.HAlign(HAlign_Center)
 			]
 		]
-#if ENGINE_MAJOR_VERSION == 4
-	]
-#endif
 	];
 }
 

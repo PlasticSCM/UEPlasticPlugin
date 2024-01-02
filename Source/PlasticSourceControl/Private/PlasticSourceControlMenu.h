@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "ISourceControlProvider.h"
 #include "Notification.h"
-#include "Runtime/Launch/Resources/Version.h"
 
 class FMenuBuilder;
 struct FToolMenuSection;
@@ -34,15 +33,8 @@ public:
 private:
 	bool IsSourceControlConnected() const;
 
-#if ENGINE_MAJOR_VERSION == 4
-	void AddMenuExtension(FMenuBuilder& Menu);
-	void AddViewBranches(FMenuBuilder& Menu);
-
-	TSharedRef<class FExtender> OnExtendLevelEditorViewMenu(const TSharedRef<class FUICommandList> CommandList);
-#elif ENGINE_MAJOR_VERSION == 5
 	void AddMenuExtension(FToolMenuSection& Menu);
 	void AddViewBranches(FToolMenuSection& Menu);
-#endif
 
 	/** Extends the UE5 toolbar with a status bar widget to display the current branch and open the branch tab */
 	void ExtendToolbarWithStatusBarWidget();
@@ -63,10 +55,6 @@ private:
 private:
 	/** Tracks if the menu extension has been registered with the editor or not */
 	bool bHasRegistered = false;
-
-#if ENGINE_MAJOR_VERSION == 4
-	FDelegateHandle ViewMenuExtenderHandle;
-#endif
 
 	/** Ongoing notification for a long-running asynchronous source control operation, if any */
 	FNotification Notification;

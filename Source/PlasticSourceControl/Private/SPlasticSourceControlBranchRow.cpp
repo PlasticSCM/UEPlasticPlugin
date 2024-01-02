@@ -7,12 +7,7 @@
 
 #include "Widgets/Text/STextBlock.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControlWindow"
 
@@ -49,11 +44,7 @@ void SPlasticSourceControlBranchRow::Construct(const FArguments& InArgs, const T
 
 TSharedRef<SWidget> SPlasticSourceControlBranchRow::GenerateWidgetForColumn(const FName& InColumnId)
 {
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	const FSlateFontInfo FontInfo = bIsCurrentBranch ? FAppStyle::GetFontStyle("BoldFont") : FAppStyle::GetFontStyle("NormalFont");
-#else
-	const FSlateFontInfo FontInfo = bIsCurrentBranch ? FEditorStyle::GetFontStyle("BoldFont") : FEditorStyle::GetFontStyle("NormalFont");
-#endif
 
 	if (InColumnId == PlasticSourceControlBranchesListViewColumn::Name::Id())
 	{
@@ -61,9 +52,7 @@ TSharedRef<SWidget> SPlasticSourceControlBranchRow::GenerateWidgetForColumn(cons
 			.Text(FText::FromString(BranchToVisualize->Name))
 			.ToolTipText(FText::FromString(BranchToVisualize->Name))
 			.Margin(FMargin(6.f, 1.f))
-#if ENGINE_MAJOR_VERSION >= 5
 			.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-#endif
 			.Font(FontInfo)
 			.HighlightText(HighlightText);
 	}
@@ -102,9 +91,7 @@ TSharedRef<SWidget> SPlasticSourceControlBranchRow::GenerateWidgetForColumn(cons
 			.Text(FText::FromString(MoveTemp(CommentOnOneLine)))
 			.ToolTipText(FText::FromString(BranchToVisualize->Comment))
 			.Margin(FMargin(6.f, 1.f))
-#if ENGINE_MAJOR_VERSION >= 5
 			.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-#endif
 			.Font(FontInfo)
 			.HighlightText(HighlightText);
 	}

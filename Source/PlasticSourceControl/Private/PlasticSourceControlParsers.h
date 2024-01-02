@@ -4,8 +4,6 @@
 
 #include "CoreMinimal.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-
 class FPlasticSourceControlChangelistState;
 class FPlasticSourceControlRevision;
 class FPlasticSourceControlState;
@@ -79,8 +77,6 @@ bool ParseUpdateResults(const TArray<FString>& InResults, TArray<FString>& OutFi
 
 FText ParseCheckInResults(const TArray<FString>& InResults);
 
-#if ENGINE_MAJOR_VERSION == 5
-
 bool ParseChangelistsResults(const FString& Results, TArray<FPlasticSourceControlChangelistState>& OutChangelistsStates, TArray<TArray<FPlasticSourceControlState>>& OutCLFilesStates);
 
 bool ParseShelveDiffResult(const FString InWorkspaceRoot, TArray<FString>&& InResults, FPlasticSourceControlChangelistState& InOutChangelistsState);
@@ -88,8 +84,6 @@ bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InR
 
 bool ParseShelvesResults(const FString& InResults, TArray<FPlasticSourceControlChangelistState>& InOutChangelistsStates);
 bool ParseShelvesResult(const FString& InResults, FString& OutComment, FDateTime& OutDate, FString& OutOwner);
-
-#endif
 
 bool ParseBranchesResults(const FString& InResults, TArray<FPlasticSourceControlBranchRef>& OutBranches);
 

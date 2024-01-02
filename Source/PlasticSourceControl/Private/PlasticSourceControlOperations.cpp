@@ -61,7 +61,6 @@ void IPlasticSourceControlWorker::RegisterWorkers(FPlasticSourceControlProvider&
 	PlasticSourceControlProvider.RegisterWorker("Copy", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticCopyWorker>));
 	PlasticSourceControlProvider.RegisterWorker("Resolve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticResolveWorker>));
 
-#if ENGINE_MAJOR_VERSION == 5
 	PlasticSourceControlProvider.RegisterWorker("UpdateChangelistsStatus", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetPendingChangelistsWorker>));
 	PlasticSourceControlProvider.RegisterWorker("NewChangelist", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticNewChangelistWorker>));
 	PlasticSourceControlProvider.RegisterWorker("DeleteChangelist", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteChangelistWorker>));
@@ -72,11 +71,8 @@ void IPlasticSourceControlWorker::RegisterWorkers(FPlasticSourceControlProvider&
 	PlasticSourceControlProvider.RegisterWorker("Unshelve", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnshelveWorker>));
 	PlasticSourceControlProvider.RegisterWorker("DeleteShelved", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteShelveWorker>));
 
-#if ENGINE_MINOR_VERSION >= 1
 	PlasticSourceControlProvider.RegisterWorker("GetChangelistDetails", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetChangelistDetailsWorker>));
 	PlasticSourceControlProvider.RegisterWorker("GetFile", FGetPlasticSourceControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetFileWorker>));
-#endif
-#endif
 }
 
 
@@ -87,11 +83,7 @@ FName FPlasticRevertUnchanged::GetName() const
 
 FText FPlasticRevertUnchanged::GetInProgressString() const
 {
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 	return LOCTEXT("SourceControl_RevertUnchanged", "Reverting unchanged file(s) in Revision Control...");
-#else
-	return LOCTEXT("SourceControl_RevertUnchanged", "Reverting unchanged file(s) in Source Control...");
-#endif
 }
 
 FName FPlasticSyncAll::GetName() const
@@ -106,11 +98,7 @@ FName FPlasticRevertAll::GetName() const
 
 FText FPlasticRevertAll::GetInProgressString() const
 {
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 	return LOCTEXT("SourceControl_RevertAll", "Reverting checked-out file(s) in Revision Control...");
-#else
-	return LOCTEXT("SourceControl_RevertAll", "Reverting checked-out file(s) in Source Control...");
-#endif
 }
 
 FName FPlasticMakeWorkspace::GetName() const
@@ -293,8 +281,6 @@ bool FPlasticConnectWorker::UpdateStates()
 }
 
 
-#if ENGINE_MAJOR_VERSION == 5
-
 static void UpdateChangelistState(FPlasticSourceControlProvider& SCCProvider, const FPlasticSourceControlChangelist& InChangelist, const TArray<FPlasticSourceControlState>& InStates)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlastic::UpdateChangelistState);
@@ -320,8 +306,6 @@ static void UpdateChangelistState(FPlasticSourceControlProvider& SCCProvider, co
 		}
 	}
 }
-
-#endif
 
 
 FName FPlasticCheckOutWorker::GetName() const
@@ -354,15 +338,11 @@ bool FPlasticCheckOutWorker::UpdateStates()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticCheckOutWorker::UpdateStates);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// If files have been checked-out directly to a CL, modify the cached state to reflect it (defaults to the Default changelist).
 	UpdateChangelistState(GetProvider(), InChangelist, States);
-#endif
 
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
-
-#if ENGINE_MAJOR_VERSION == 5
 
 bool DeleteChangelist(const FPlasticSourceControlProvider& PlasticSourceControlProvider, const FPlasticSourceControlChangelist& InChangelist, TArray<FString>& OutResults, TArray<FString>& OutErrorMessages)
 {
@@ -396,19 +376,15 @@ TArray<FString> FileNamesFromFileStates(const TArray<FSourceControlStateRef>& In
 	return Files;
 }
 
-#endif
-
 TArray<FString> GetFilesFromCommand(FPlasticSourceControlProvider& PlasticSourceControlProvider, FPlasticSourceControlCommand& InCommand)
 {
 	TArray<FString> Files;
-#if ENGINE_MAJOR_VERSION == 5
 	if (InCommand.Changelist.IsInitialized() && InCommand.Files.IsEmpty())
 	{
 		TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> ChangelistState = PlasticSourceControlProvider.GetStateInternal(InCommand.Changelist);
 		Files = FileNamesFromFileStates(ChangelistState->Files);
 	}
 	else
-#endif
 	{
 		Files = InCommand.Files;
 	}
@@ -433,7 +409,6 @@ bool FPlasticCheckInWorker::Execute(FPlasticSourceControlCommand& InCommand)
 
 	if (Files.Num() > 0)
 	{
-#if ENGINE_MAJOR_VERSION == 5
 		if (InCommand.Changelist.IsInitialized())
 		{
 			TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(InCommand.Changelist);
@@ -445,7 +420,6 @@ bool FPlasticCheckInWorker::Execute(FPlasticSourceControlCommand& InCommand)
 
 			InChangelist = InCommand.Changelist;
 		}
-#endif
 
 		UE_LOG(LogSourceControl, Verbose, TEXT("CheckIn: %d file(s) Description: '%s'"), Files.Num(), *Description.ToString());
 
@@ -473,13 +447,11 @@ bool FPlasticCheckInWorker::Execute(FPlasticSourceControlCommand& InCommand)
 				UE_LOG(LogSourceControl, Log, TEXT("CheckIn successful"));
 			}
 
-#if ENGINE_MAJOR_VERSION == 5
 			if (InChangelist.IsInitialized() && !InChangelist.IsDefault())
 			{
 				// NOTE: we need to explicitly delete persistent changelists when we submit its content, except for the Default changelist
 				DeleteChangelist(GetProvider(), InChangelist, InCommand.InfoMessages, InCommand.ErrorMessages);
 			}
-#endif
 		}
 
 		// now update the status of our files
@@ -497,7 +469,6 @@ bool FPlasticCheckInWorker::UpdateStates()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticCheckInWorker::UpdateStates);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// Is the submit of a full changelist (from the View Changelists window) or a set of files (from the Submit Content window)?
 	if (InChangelist.IsInitialized())
 	{
@@ -535,7 +506,6 @@ bool FPlasticCheckInWorker::UpdateStates()
 			}
 		}
 	}
-#endif
 
 	// Remove any deleted files from status cache
 	for (const auto& State : States)
@@ -603,10 +573,8 @@ bool FPlasticMarkForAddWorker::UpdateStates()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticMarkForAddWorker::UpdateStates);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// If files have been added directly to a CL, modify the cached state to reflect it (defaults to the Default changelist).
 	UpdateChangelistState(GetProvider(), InChangelist, States);
-#endif
 
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
@@ -641,10 +609,8 @@ bool FPlasticDeleteWorker::UpdateStates()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticDeleteWorkers::UpdateStates);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// If files have been deleted directly to a CL, modify the cached state to reflect it (defaults to the Default changelist).
 	UpdateChangelistState(GetProvider(), InChangelist, States);
-#endif
 
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
@@ -660,11 +626,7 @@ bool FPlasticRevertWorker::Execute(FPlasticSourceControlCommand& InCommand)
 
 	check(InCommand.Operation->GetName() == GetName());
 	TSharedRef<FRevert, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FRevert>(InCommand.Operation);
-#if ENGINE_MAJOR_VERSION == 5
 	const bool bIsSoftRevert = Operation->IsSoftRevert();
-#else
-	const bool bIsSoftRevert = false;
-#endif
 	if (bIsSoftRevert && GetProvider().GetPlasticScmVersion() < PlasticSourceControlVersions::UndoCheckoutKeepChanges)
 	{
 		// If a soft revert is requested but not supported by the version of Unity Version Control, warn the user and stop
@@ -714,12 +676,10 @@ bool FPlasticRevertWorker::Execute(FPlasticSourceControlCommand& InCommand)
 				// and delete the Redirector (else the reverted file will collide with it and create a *.private.0 file)
 				IFileManager::Get().Delete(*MovedFrom);
 			}
-#if ENGINE_MAJOR_VERSION == 5
 			else if (State->WorkspaceState == EWorkspaceState::Added && Operation->ShouldDeleteNewFiles())
 			{
 				IFileManager::Get().Delete(*File);
 			}
-#endif
 		}
 	}
 
@@ -758,11 +718,9 @@ bool FPlasticRevertWorker::Execute(FPlasticSourceControlCommand& InCommand)
 	}
 
 	// NOTE: optim, in UE4 there was no need to update the status of our files since this is done immediately after by the Editor, except now that we are using changelists
-#if ENGINE_MAJOR_VERSION == 5
 	// update the status of our files: need to check for local changes in case of a SoftRevert
 	const PlasticSourceControlUtils::EStatusSearchType SearchType = bIsSoftRevert ? PlasticSourceControlUtils::EStatusSearchType::All : PlasticSourceControlUtils::EStatusSearchType::ControlledOnly;
 	PlasticSourceControlUtils::RunUpdateStatus(Files, SearchType, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
-#endif
 
 	return InCommand.bCommandSuccessful;
 }
@@ -771,7 +729,6 @@ bool FPlasticRevertWorker::UpdateStates()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticRevertWorker::UpdateStates);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// Update affected changelists if any
 	for (const FPlasticSourceControlState& NewState : States)
 	{
@@ -785,7 +742,6 @@ bool FPlasticRevertWorker::UpdateStates()
 			State->Changelist.Reset();
 		}
 	}
-#endif
 
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
@@ -823,7 +779,6 @@ bool FPlasticRevertUnchangedWorker::UpdateStates()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticRevertUnchangedWorker::UpdateStates);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// Update affected changelists if any
 	for (const FPlasticSourceControlState& NewState : States)
 	{
@@ -840,7 +795,6 @@ bool FPlasticRevertUnchangedWorker::UpdateStates()
 			}
 		}
 	}
-#endif
 
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
@@ -868,12 +822,10 @@ bool FPlasticRevertAllWorker::Execute(FPlasticSourceControlCommand& InCommand)
 		{
 			if (State.CanRevert())
 			{
-#if ENGINE_MAJOR_VERSION == 5
 				if (State.WorkspaceState == EWorkspaceState::Added && Operation->ShouldDeleteNewFiles())
 				{
 					IFileManager::Get().Delete(*State.GetFilename());
 				}
-#endif
 
 				// Add all modified files to the list of files to be updated (reverted and then reloaded)
 				Operation->UpdatedFiles.Add(MoveTemp(State.LocalFilename));
@@ -921,7 +873,6 @@ bool FPlasticRevertAllWorker::UpdateStates()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticRevertAllWorker::UpdateStates);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// Update affected changelists if any
 	for (const FPlasticSourceControlState& NewState : States)
 	{
@@ -939,7 +890,6 @@ bool FPlasticRevertAllWorker::UpdateStates()
 			}
 		}
 	}
-#endif
 
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
@@ -1149,10 +1099,8 @@ bool FPlasticMergeBranchWorker::Execute(FPlasticSourceControlCommand& InCommand)
 
 bool FPlasticMergeBranchWorker::UpdateStates()
 {
-#if ENGINE_MAJOR_VERSION == 5
 	// Update the Default changelist.
 	UpdateChangelistState(GetProvider(), FPlasticSourceControlChangelist::DefaultChangelist, States);
-#endif
 
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
@@ -1256,33 +1204,6 @@ bool FPlasticUpdateStatusWorker::Execute(FPlasticSourceControlCommand& InCommand
 		{
 			// Get the history of the files (on all branches)
 			InCommand.bCommandSuccessful &= PlasticSourceControlUtils::RunGetHistory(Operation->ShouldUpdateHistory(), States, InCommand.ErrorMessages);
-
-#if ENGINE_MAJOR_VERSION == 4 || (ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 3)
-			// Special case for conflicts
-			for (FPlasticSourceControlState& State : States)
-			{
-				if (State.IsConflicted())
-				{
-					// In case of a merge conflict, the Editor expects the tip of the "source (remote)" branch to be at the top of the history (index 0)
-					// as a way to represent the "merge in progress" in a 1D graph of the current branch "target (local)"
-					UE_LOG(LogSourceControl, Log, TEXT("%s: PendingMergeSourceChangeset %d"), *State.LocalFilename, State.PendingMergeSourceChangeset);
-					for (int32 IdxRevision = 0; IdxRevision < State.History.Num(); IdxRevision++)
-					{
-						const auto& Revision = State.History[IdxRevision];
-						if (Revision->ChangesetNumber == State.PendingMergeSourceChangeset)
-						{
-							// If the Source Changeset is not already at the top of the History, duplicate it there.
-							if (IdxRevision > 0)
-							{
-								const auto RevisionCopy = Revision;
-								State.History.Insert(RevisionCopy, 0);
-							}
-							break;
-						}
-					}
-				}
-			}
-#endif
 		}
 		else
 		{
@@ -1322,7 +1243,6 @@ bool FPlasticUpdateStatusWorker::UpdateStates()
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticUpdateStatusWorker::UpdateStates);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// Update affected changelists if any (in case of a file reverted outside of the Unreal Editor)
 	for (const FPlasticSourceControlState& NewState : States)
 	{
@@ -1339,56 +1259,9 @@ bool FPlasticUpdateStatusWorker::UpdateStates()
 			}
 		}
 	}
-#endif
 
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
-
-#if ENGINE_MAJOR_VERSION == 4 || ENGINE_MINOR_VERSION < 1
-/// Detect if the operation is a duplicate/copy or a rename/move, and if it leaved a redirector (ie it was a move of a source controlled asset)
-bool IsMoveOperation(const FString& InOrigin)
-{
-	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticCopyWorker::IsMoveOperation);
-
-	bool bIsMoveOperation = true;
-
-	FString PackageName;
-	if (FPackageName::TryConvertFilenameToLongPackageName(InOrigin, PackageName))
-	{
-		// Use AsyncTask to call AssetRegistry GetAssetsByPackageName') on Game Thread
-		const TSharedRef<TPromise<TArray<FAssetData>>, ESPMode::ThreadSafe> Promise = MakeShareable(new TPromise<TArray<FAssetData>>());
-		AsyncTask(ENamedThreads::GameThread, [Promise, PackageName]()
-		{
-			TArray<FAssetData> AssetsData;
-			FAssetRegistryModule& AssetRegistryModule = FModuleManager::GetModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
-			AssetRegistryModule.Get().GetAssetsByPackageName(FName(*PackageName), AssetsData);
-			Promise->SetValue(MoveTemp(AssetsData));
-		});
-		const TArray<FAssetData> AssetsData = Promise->GetFuture().Get();
-		UE_LOG(LogSourceControl, Log, TEXT("IsMoveOperation: PackageName: %s, AssetsData: Num=%d"), *PackageName, AssetsData.Num());
-		if (AssetsData.Num() > 0)
-		{
-			const FAssetData& AssetData = AssetsData[0];
-			if (!AssetData.IsRedirector())
-			{
-				UE_LOG(LogSourceControl, Log, TEXT("IsMoveOperation: %s is a plain asset, so it's a duplicate/copy"), *InOrigin);
-				bIsMoveOperation = false;
-			}
-			else
-			{
-				UE_LOG(LogSourceControl, Log, TEXT("IsMoveOperation: %s is a redirector, so it's a move/rename"), *InOrigin);
-			}
-		}
-		else
-		{
-			// no asset in package (no redirector) so it should be a rename/move of a newly Added (not Controlled/Checked-In) file
-			UE_LOG(LogSourceControl, Log, TEXT("IsMoveOperation: %s does not have asset in package (ie. no redirector) so it's a move/rename of a newly added file"), *InOrigin);
-		}
-	}
-
-	return bIsMoveOperation;
-}
-#endif
 
 FName FPlasticCopyWorker::GetName() const
 {
@@ -1407,13 +1280,8 @@ bool FPlasticCopyWorker::Execute(FPlasticSourceControlCommand& InCommand)
 		const FString& Origin = InCommand.Files[0];
 		const FString Destination = FPaths::ConvertRelativePathToFull(Operation->GetDestination());
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		// Branch: The new file is branched from the original file (vs Add: The new file has no relation to the original file)
 		const bool bIsMoveOperation = (Operation->CopyMethod == FCopy::ECopyMethod::Branch);
-#else
-		// Detect if the operation is a duplicate/copy or a rename/move, by checking if it leaved a redirector (ie it was a move of a source controlled asset)
-		const bool bIsMoveOperation = IsMoveOperation(Origin);
-#endif
 		if (bIsMoveOperation)
 		{
 			UE_LOG(LogSourceControl, Log, TEXT("Moving %s to %s..."), *Origin, *Destination);
@@ -1543,15 +1411,9 @@ bool FPlasticResolveWorker::Execute(FPlasticSourceControlCommand& InCommand)
 		Parameters.Add(TEXT("--keepdestination"));
 
 		TArray<FString> OneFile;
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		OneFile.Add(State->PendingResolveInfo.BaseFile);
 
 		UE_LOG(LogSourceControl, Log, TEXT("resolve %s"), *State->PendingResolveInfo.BaseFile);
-#else
-		OneFile.Add(State->PendingMergeFilename);
-
-		UE_LOG(LogSourceControl, Log, TEXT("resolve %s"), *State->PendingMergeFilename);
-#endif
 		// Mark the conflicted file as resolved
 		InCommand.bCommandSuccessful = PlasticSourceControlUtils::RunCommand(TEXT("merge"), Parameters, OneFile, InCommand.InfoMessages, InCommand.ErrorMessages);
 	}
@@ -1569,8 +1431,6 @@ bool FPlasticResolveWorker::UpdateStates()
 	return PlasticSourceControlUtils::UpdateCachedStates(MoveTemp(States));
 }
 
-
-#if ENGINE_MAJOR_VERSION == 5
 
 FName FPlasticGetPendingChangelistsWorker::GetName() const
 {
@@ -2476,8 +2336,6 @@ namespace ReviewHelpers
 	constexpr int32 RecordIndex = 0;
 } // namespace ReviewHelpers
 
-#if ENGINE_MINOR_VERSION >= 1
-
 FName FPlasticGetChangelistDetailsWorker::GetName() const
 {
 	return "GetChangelistDetails";
@@ -2591,8 +2449,5 @@ bool FPlasticGetFileWorker::UpdateStates()
 {
 	return false;
 }
-
-#endif
-#endif
 
 #undef LOCTEXT_NAMESPACE

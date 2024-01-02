@@ -4,8 +4,8 @@
 
 #include "Async/Async.h"
 #include "Editor.h"
-#include "ISourceControlModule.h" // LogSourceControl
 #include "FileHelpers.h"
+#include "ISourceControlModule.h" // LogSourceControl
 #include "PackageTools.h"
 #include "UObject/Linker.h"
 
@@ -25,7 +25,7 @@ static UWorld* GetCurrentWorld()
 	return nullptr;
 }
 
-TArray<FString> AssetDateToFileNames(const TArray<FAssetData>& InAssetObjectPaths)
+TArray<FString> AssetDataToFileNames(const TArray<FAssetData>& InAssetObjectPaths)
 {
 	TArray<FString> FileNames;
 	FileNames.Reserve(InAssetObjectPaths.Num());
@@ -135,7 +135,6 @@ static TArray<UPackage*> ListPackagesToReload(const TArray<FString>& InFiles)
 {
 	TArray<UPackage*> LoadedPackages = FileNamesToLoadedPackages(InFiles);
 
-#if ENGINE_MAJOR_VERSION == 5
 	// Detects if some packages to reload are part of the current map
 	// (ie assets within __ExternalActors__ or __ExternalObjects__ from the new One File Per Actor (OFPA) in UE5)
 	// in which case the current map need to be reloaded, so it needs to be added to the list of packages if not already there
@@ -176,7 +175,6 @@ static TArray<UPackage*> ListPackagesToReload(const TArray<FString>& InFiles)
 			}
 		}
 	}
-#endif
 
 	return LoadedPackages;
 }

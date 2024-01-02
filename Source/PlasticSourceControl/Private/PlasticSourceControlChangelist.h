@@ -3,9 +3,6 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Runtime/Launch/Resources/Version.h"
-
-#if ENGINE_MAJOR_VERSION == 5
 
 #include "ISourceControlChangelist.h"
 
@@ -23,12 +20,10 @@ public:
 	{
 	}
 
-#if ENGINE_MINOR_VERSION >= 1
 	virtual bool CanDelete() const override
 	{
 		return !IsDefault();
 	}
-#endif
 
 	bool operator==(const FPlasticSourceControlChangelist& InOther) const
 	{
@@ -40,7 +35,7 @@ public:
 		return ChangelistName != InOther.ChangelistName;
 	}
 
-	virtual bool IsDefault() const /* override NOTE: added in UE5.3 */
+	virtual bool IsDefault() const override
 	{
 		return ChangelistName == DefaultChangelist.ChangelistName;
 	}
@@ -71,7 +66,7 @@ public:
 		return ChangelistName;
 	}
 
-	virtual FString GetIdentifier() const /* override NOTE: added in UE5.3 */
+	virtual FString GetIdentifier() const override
 	{
 		return ChangelistName;
 	}
@@ -85,5 +80,3 @@ private:
 };
 
 typedef TSharedRef<class FPlasticSourceControlChangelist, ESPMode::ThreadSafe> FPlasticSourceControlChangelistRef;
-
-#endif

@@ -13,11 +13,8 @@
 #include "Misc/Paths.h"
 #include "XmlParser.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5
 #include "PlasticSourceControlChangelist.h"
 #include "PlasticSourceControlChangelistState.h"
-#endif
 
 namespace PlasticSourceControlParsers
 {
@@ -384,7 +381,6 @@ void ParseDirectoryStatusResult(const FString& InDir, const TArray<FString>& InR
 			State->WorkspaceState = EWorkspaceState::Controlled;
 		}
 
-#if ENGINE_MAJOR_VERSION == 5
 		// also remove the file from its changelist if any
 		if (State->Changelist.IsInitialized())
 		{
@@ -394,7 +390,6 @@ void ParseDirectoryStatusResult(const FString& InDir, const TArray<FString>& InR
 			// 2- And reset the reference to their previous changelist
 			State->Changelist.Reset();
 		}
-#endif
 	}
 }
 
@@ -704,11 +699,7 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 		{
 			if (const FXmlNode* RevisionNode = RevisionNodes[Index])
 			{
-#if ENGINE_MAJOR_VERSION == 4
-				const TSharedRef<FPlasticSourceControlRevision, ESPMode::ThreadSafe> SourceControlRevision = MakeShareable(new FPlasticSourceControlRevision);
-#elif ENGINE_MAJOR_VERSION == 5
 				const TSharedRef<FPlasticSourceControlRevision, ESPMode::ThreadSafe> SourceControlRevision = MakeShared<FPlasticSourceControlRevision>();
-#endif
 				SourceControlRevision->State = &InOutState;
 				SourceControlRevision->Filename = Filename;
 
@@ -783,11 +774,7 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 				// since we usually don't want to display changes from other branches in the History window...
 				// except in case of a merge conflict, where the Editor expects the tip of the "source (remote)" branch to be at the top of the history!
 				if (   (SourceControlRevision->ChangesetNumber > InOutState.DepotRevisionChangeset)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 					&& (SourceControlRevision->GetRevision() != InOutState.PendingResolveInfo.RemoteRevision))
-#else
-					&& (SourceControlRevision->ChangesetNumber != InOutState.PendingMergeSourceChangeset))
-#endif
 				{
 					InOutState.HeadBranch = SourceControlRevision->Branch;
 					InOutState.HeadAction = SourceControlRevision->Action;
@@ -968,8 +955,6 @@ FText ParseCheckInResults(const TArray<FString>& InResults)
 	}
 	return FText();
 }
-
-#if ENGINE_MAJOR_VERSION == 5
 
 /**
  * Parse results of the 'cm status --changelists --controlledchanged --noheader --xml --encoding="utf-8"' command.
@@ -1419,8 +1404,6 @@ bool ParseShelvesResult(const FString& InResults, FString& OutComment, FDateTime
 
 	return bResult;
 }
-
-#endif
 
 /**
  * Parse results of the 'cm find "branches where date >= 'YYYY-MM-DD' or changesets >= 'YYYY-MM-DD'" --xml --encoding="utf-8"' command.

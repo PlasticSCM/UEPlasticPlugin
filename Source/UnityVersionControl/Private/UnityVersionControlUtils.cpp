@@ -139,15 +139,35 @@ FString GetConfigDefaultRepServer()
 	return ServerUrl;
 }
 
-void GetUserName(FString& OutUserName)
+FString GetDefaultUserName()
 {
+	FString UserName;
 	TArray<FString> Results;
 	TArray<FString> ErrorMessages;
 	const bool bResult = RunCommand(TEXT("whoami"), TArray<FString>(), TArray<FString>(), Results, ErrorMessages);
 	if (bResult && Results.Num() > 0)
 	{
-		OutUserName = MoveTemp(Results[0]);
+		UserName = MoveTemp(Results[0]);
 	}
+
+	return UserName;
+}
+
+FString GetProfileUserName(const FString& InServerUrl)
+{
+	FString UserName;
+	TArray<FString> Results;
+	TArray<FString> Parameters;
+	TArray<FString> ErrorMessages;
+	Parameters.Add("list");
+	Parameters.Add(TEXT("--format=\"{server};{user}\""));
+	bool bResult = RunCommand(TEXT("profile"), Parameters, TArray<FString>(), Results, ErrorMessages);
+	if (bResult)
+	{
+		bResult = UnityVersionControlParsers::ParseProfileInfo(Results, InServerUrl, UserName);
+	}
+
+	return UserName;
 }
 
 bool GetWorkspaceName(const FString& InWorkspaceRoot, FString& OutWorkspaceName, TArray<FString>& OutErrorMessages)
@@ -671,23 +691,6 @@ bool RunGetFile(const FString& InRevSpec, const FString& InDumpFileName)
 	return bResult;
 }
 
-// Convert a file state to a string ala Perforce, see also ParseShelveFileStatus()
-FString FileStateToAction(const EWorkspaceState InState)
-{
-	switch (InState)
-	{
-	case EWorkspaceState::Added:
-		return TEXT("add");
-	case EWorkspaceState::Deleted:
-		return TEXT("delete");
-	case EWorkspaceState::Moved:
-		return TEXT("branch");
-	case EWorkspaceState::CheckedOutChanged:
-	default:
-		return TEXT("edit");
-	}
-}
-
 // Run a Plastic "history" command and parse it's XML result.
 bool RunGetHistory(const bool bInUpdateHistory, TArray<FUnityVersionControlState>& InOutStates, TArray<FString>& OutErrorMessages)
 {
@@ -702,7 +705,8 @@ bool RunGetHistory(const bool bInUpdateHistory, TArray<FUnityVersionControlState
 	{
 		Parameters.Add(TEXT("--moveddeleted"));
 	}
-	Parameters.Add(TEXT("--xml"));
+	const FScopedTempFile HistoryResultFile;
+	Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *HistoryResultFile.GetFilename()));
 	Parameters.Add(TEXT("--encoding=\"utf-8\""));
 	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
 	if (Provider.GetPlasticScmVersion() >= UnityVersionControlVersions::NewHistoryLimit)
@@ -737,7 +741,7 @@ bool RunGetHistory(const bool bInUpdateHistory, TArray<FUnityVersionControlState
 		bResult = RunCommand(TEXT("history"), Parameters, Files, Results, Errors);
 		if (bResult)
 		{
-			bResult = UnityVersionControlParsers::ParseHistoryResults(bInUpdateHistory, Results, InOutStates);
+			bResult = UnityVersionControlParsers::ParseHistoryResults(bInUpdateHistory, HistoryResultFile.GetFilename(), InOutStates);
 		}
 		if (!Errors.IsEmpty())
 		{
@@ -758,9 +762,9 @@ bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace,
 	// Detect special case for a partial checkout (CS:-1 in Gluon mode)!
 	if (!bInIsPartialWorkspace)
 	{
-		const FScopedTempFile TempFile;
+		const FScopedTempFile UpdateResultFile;
 		TArray<FString> InfoMessages;
-		Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *TempFile.GetFilename()));
+		Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *UpdateResultFile.GetFilename()));
 		Parameters.Add(TEXT("--encoding=\"utf-8\""));
 		Parameters.Add(TEXT("--last"));
 		Parameters.Add(TEXT("--dontmerge"));
@@ -769,7 +773,7 @@ bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace,
 		{
 			// Load and parse the result of the update command
 			FString Results;
-			if (FFileHelper::LoadFileToString(Results, *TempFile.GetFilename()))
+			if (FFileHelper::LoadFileToString(Results, *UpdateResultFile.GetFilename()))
 			{
 				bResult = UnityVersionControlParsers::ParseUpdateResults(Results, OutUpdatedFiles);
 			}
@@ -1004,10 +1008,10 @@ bool RunSwitchToBranch(const FString& InBranchName, TArray<FString>& OutUpdatedF
 {
 	bool bResult = false;
 
-	const FScopedTempFile TempFile;
+	const FScopedTempFile SwitchResultFile;
 	TArray<FString> InfoMessages;
 	TArray<FString> Parameters;
-	Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *TempFile.GetFilename()));
+	Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *SwitchResultFile.GetFilename()));
 	Parameters.Add(TEXT("--encoding=\"utf-8\""));
 	Parameters.Add(FString::Printf(TEXT("\"br:%s\""), *InBranchName));
 	bResult = UnityVersionControlUtils::RunCommand(TEXT("switch"), Parameters, TArray<FString>(), InfoMessages, OutErrorMessages);
@@ -1015,7 +1019,7 @@ bool RunSwitchToBranch(const FString& InBranchName, TArray<FString>& OutUpdatedF
 	{
 		// Load and parse the result of the update command
 		FString Results;
-		if (FFileHelper::LoadFileToString(Results, *TempFile.GetFilename()))
+		if (FFileHelper::LoadFileToString(Results, *SwitchResultFile.GetFilename()))
 		{
 			bResult = UnityVersionControlParsers::ParseUpdateResults(Results, OutUpdatedFiles);
 		}
@@ -1028,10 +1032,10 @@ bool RunMergeBranch(const FString& InBranchName, TArray<FString>& OutUpdatedFile
 {
 	bool bResult = false;
 
-	const FScopedTempFile TempFile;
+	const FScopedTempFile MergeResultFile;
 	TArray<FString> InfoMessages;
 	TArray<FString> Parameters;
-	Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *TempFile.GetFilename()));
+	Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *MergeResultFile.GetFilename()));
 	Parameters.Add(TEXT("--encoding=\"utf-8\""));
 	Parameters.Add(TEXT("--merge"));
 	Parameters.Add(FString::Printf(TEXT("\"br:%s\""), *InBranchName));
@@ -1040,7 +1044,7 @@ bool RunMergeBranch(const FString& InBranchName, TArray<FString>& OutUpdatedFile
 	{
 		// Load and parse the result of the update command
 		FString Results;
-		if (FFileHelper::LoadFileToString(Results, *TempFile.GetFilename()))
+		if (FFileHelper::LoadFileToString(Results, *MergeResultFile.GetFilename()))
 		{
 			UnityVersionControlParsers::ParseMergeResults(Results, OutUpdatedFiles);
 		}
@@ -1059,7 +1063,7 @@ bool RunCreateBranch(const FString& InBranchName, const FString& InComment, TArr
 		TArray<FString> InfoMessages;
 		Parameters.Add(TEXT("create"));
 		Parameters.Add(FString::Printf(TEXT("\"%s\""), *InBranchName));
-		Parameters.Add(FString::Printf(TEXT("--commentsfile=\"%s\""), *FPaths::ConvertRelativePathToFull(BranchCommentFile.GetFilename())));
+		Parameters.Add(FString::Printf(TEXT("--commentsfile=\"%s\""), *BranchCommentFile.GetFilename()));
 		return UnityVersionControlUtils::RunCommand(TEXT("branch"), Parameters, TArray<FString>(), InfoMessages, OutErrorMessages);
 	}
 

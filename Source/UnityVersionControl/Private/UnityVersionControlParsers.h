@@ -62,6 +62,8 @@ struct FRemoveRedundantErrors
 	FString Filter;
 };
 
+bool ParseProfileInfo(TArray<FString>& InResults, const FString& InServerUrl, FString& OutUserName);
+
 bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl);
 
 bool GetChangesetFromWorkspaceStatus(const TArray<FString>& InResults, int32& OutChangeset);
@@ -72,7 +74,7 @@ void ParseDirectoryStatusResult(const FString& InDir, const TArray<FString>& InR
 
 void ParseFileinfoResults(const TArray<FString>& InResults, TArray<FUnityVersionControlState>& InOutStates);
 
-bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InResults, TArray<FUnityVersionControlState>& InOutStates);
+bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InResultFilename, TArray<FUnityVersionControlState>& InOutStates);
 
 bool ParseUpdateResults(const FString& InResults, TArray<FString>& OutFiles);
 bool ParseUpdateResults(const TArray<FString>& InResults, TArray<FString>& OutFiles);

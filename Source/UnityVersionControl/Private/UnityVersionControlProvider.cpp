@@ -136,20 +136,25 @@ void FUnityVersionControlProvider::CheckPlasticAvailability()
 
 		bUsesLocalReadOnlyState = UnityVersionControlUtils::GetConfigSetFilesAsReadOnly();
 
-		// Get user name (from the global Unity Version Control client config)
-		UnityVersionControlUtils::GetUserName(UserName);
-
 		// Register Console Commands
 		UnityVersionControlConsole.Register();
 
-		if (!bWorkspaceFound)
+		if (bWorkspaceFound)
+		{
+			TArray<FString> ErrorMessages;
+			UnityVersionControlUtils::GetWorkspaceInfo(BranchName, RepositoryName, ServerUrl, ErrorMessages);
+			UserName = UnityVersionControlUtils::GetProfileUserName(ServerUrl);
+		}
+		else
 		{
 			// This info message is only useful here, if bPlasticAvailable, for the Login window
 			FFormatNamedArguments Args;
 			Args.Add(TEXT("WorkspacePath"), FText::FromString(PathToWorkspaceRoot));
 			FMessageLog("SourceControl").Info(FText::Format(LOCTEXT("NotInAWorkspace", "{WorkspacePath} is not in a workspace."), Args));
 
+			// Get default server and user name (from the global client config)
 			ServerUrl = UnityVersionControlUtils::GetConfigDefaultRepServer();
+			UserName = UnityVersionControlUtils::GetDefaultUserName();
 		}
 	}
 }
@@ -182,11 +187,7 @@ TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe> FUnityVersionControlP
 	else
 	{
 		// cache an unknown state for this item
-#if ENGINE_MAJOR_VERSION == 4
 		TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe> NewState = MakeShareable(new FUnityVersionControlState(FString(InFilename)));
-#elif ENGINE_MAJOR_VERSION == 5
-		TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe> NewState = MakeShared<FUnityVersionControlState>(FString(InFilename));
-#endif
 		StateCache.Add(InFilename, NewState);
 		return NewState;
 	}

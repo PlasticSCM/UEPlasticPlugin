@@ -25,6 +25,39 @@ namespace UnityVersionControlParsers
 #define FILE_STATUS_SEPARATOR TEXT(";")
 
 
+/**
+ * Parse the output of the "cm profile list --format="{server};{user}" command
+ *
+ * Example:
+localhost:8087|sebastien.rombauts
+local|sebastien.rombauts@unity3d.com
+SRombautsU@cloud|sebastien.rombauts@unity3d.com
+*/
+bool ParseProfileInfo(TArray<FString>& InResults, const FString& InServerUrl, FString& OutUserName)
+{
+	for (const FString& Result : InResults)
+	{
+		TArray<FString> ProfileInfos;
+		Result.ParseIntoArray(ProfileInfos, FILE_STATUS_SEPARATOR, false); // Don't cull empty values
+		if (ProfileInfos.Num() == 2)
+		{
+			if (ProfileInfos[0] == InServerUrl)
+			{
+				OutUserName = ProfileInfos[1];
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+/**
+ * Parse  workspace information, in the form "Branch /main@UE5PlasticPluginDev@localhost:8087"
+ *                                        or "Branch /main@UE5PlasticPluginDev@test@cloud" (when connected to the cloud)
+ *                                        or "Branch /main@rep:UE5OpenWorldPerfTest@repserver:test@cloud"
+ *                                        or "Changeset 1234@UE5PlasticPluginDev@test@cloud" (when the workspace is switched on a changeset instead of a branch)
+*/ 
 bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl)
 {
 	if (InResults.Num() == 0)
@@ -32,10 +65,6 @@ bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FStr
 		return false;
 	}
 
-	// Get workspace information, in the form "Branch /main@UE5PlasticPluginDev@localhost:8087"
-	//                                     or "Branch /main@UE5PlasticPluginDev@test@cloud" (when connected to the cloud)
-	//                                     or "Branch /main@rep:UE5OpenWorldPerfTest@repserver:test@cloud"
-	//                                     or "Changeset 1234@UE5PlasticPluginDev@test@cloud" (when the workspace is switched on a changeset instead of a branch)
 	static const FString BranchPrefix(TEXT("Branch "));
 	static const FString ChangesetPrefix(TEXT("Changeset "));
 	static const FString LabelPrefix(TEXT("Label "));
@@ -131,11 +160,11 @@ static EWorkspaceState StateFromStatus(const FString& InFileStatus, const bool b
 {
 	EWorkspaceState State;
 
-	if (InFileStatus == "CH") // Modified but not Checked-Out
+	if (InFileStatus == TEXT("CH")) // Modified but not Checked-Out
 	{
 		State = EWorkspaceState::Changed;
 	}
-	else if (InFileStatus == "CO") // Checked-Out with no change, or "don't know" if using on an old version of cm
+	else if (InFileStatus == TEXT("CO")) // Checked-Out with no change, or "don't know" if using on an old version of cm
 	{
 		// Recent version can distinguish between CheckedOut with or with no changes
 		if (bInUsesCheckedOutChanged)
@@ -147,7 +176,7 @@ static EWorkspaceState StateFromStatus(const FString& InFileStatus, const bool b
 			State = EWorkspaceState::CheckedOutChanged; // Older version; need to assume it is changed to retain behavior
 		}
 	}
-	else if (InFileStatus == "CO+CH") // Checked-Out and changed from the new --iscochanged
+	else if (InFileStatus == TEXT("CO+CH")) // Checked-Out and changed from the new --iscochanged
 	{
 		State = EWorkspaceState::CheckedOutChanged; // Recent version; here it's checkedout with changes
 	}
@@ -163,23 +192,23 @@ static EWorkspaceState StateFromStatus(const FString& InFileStatus, const bool b
 	{
 		State = EWorkspaceState::Replaced;
 	}
-	else if (InFileStatus == "AD")
+	else if (InFileStatus == TEXT("AD"))
 	{
 		State = EWorkspaceState::Added;
 	}
-	else if ((InFileStatus == "PR") || (InFileStatus == "LM")) // Not Controlled/Not in Depot/Untracked (or Locally Moved/Renamed)
+	else if ((InFileStatus == TEXT("PR")) || (InFileStatus == TEXT("LM"))) // Not Controlled/Not in Depot/Untracked (or Locally Moved/Renamed)
 	{
 		State = EWorkspaceState::Private;
 	}
-	else if (InFileStatus == "IG")
+	else if (InFileStatus == TEXT("IG"))
 	{
 		State = EWorkspaceState::Ignored;
 	}
-	else if (InFileStatus == "DE")
+	else if (InFileStatus == TEXT("DE"))
 	{
 		State = EWorkspaceState::Deleted; // Deleted (removed from source control)
 	}
-	else if (InFileStatus == "LD")
+	else if (InFileStatus.Contains(TEXT("LD"))) // "LD", "AD+LD"
 	{
 		State = EWorkspaceState::LocallyDeleted; // Locally Deleted (ie. missing)
 	}
@@ -550,20 +579,30 @@ FPlasticMergeConflictParser::FPlasticMergeConflictParser(const FString& InResult
 	}
 }
 
+// Types of changes in source control revisions, using Perforce terminology for the History window
+static const TCHAR* SourceControlActionAdded = TEXT("add");
+static const TCHAR* SourceControlActionDeleted = TEXT("delete");
+static const TCHAR* SourceControlActionMoved = TEXT("branch");
+static const TCHAR* SourceControlActionMerged = TEXT("integrate");
+static const TCHAR* SourceControlActionChanged = TEXT("edit");
+
 // Convert a file state to a string ala Perforce, see also ParseShelveFileStatus()
 FString FileStateToAction(const EWorkspaceState InState)
 {
 	switch (InState)
 	{
 	case EWorkspaceState::Added:
-		return TEXT("add");
+		return SourceControlActionAdded;
 	case EWorkspaceState::Deleted:
-		return TEXT("delete");
+		return SourceControlActionDeleted;
 	case EWorkspaceState::Moved:
-		return TEXT("branch");
+	case EWorkspaceState::Copied:
+		return SourceControlActionMoved;
+	case EWorkspaceState::Replaced:
+		return SourceControlActionMerged;
 	case EWorkspaceState::CheckedOutChanged:
 	default:
-		return TEXT("edit");
+		return SourceControlActionChanged;
 	}
 }
 
@@ -598,18 +637,37 @@ static FString DecodeXmlEntities(const FString& InString)
 		  <CreationDate>2019-10-14T09:52:07+02:00</CreationDate>
 		  <RevisionType>bin</RevisionType>
 		  <ChangesetNumber>7</ChangesetNumber>
-		  <Owner>SRombauts</Owner>
+		  <Owner>sebastien.rombauts</Owner>
 		  <Comment>New tests</Comment>
 		  <Repository>UE4PlasticPluginDev</Repository>
 		  <Server>localhost:8087</Server>
 		  <RepositorySpec>UE4PlasticPluginDev@localhost:8087</RepositorySpec>
+		  <DataStatus>Available</DataStatus>
+		  <ItemId>1657</ItemId>
 		  <Size>22356</Size>
 		  <Hash>zzuB6G9fbWz1md12+tvBxg==</Hash>
 		</Revision>
 		...
 		<Revision>
 		  <RevisionSpec>C:/Workspace/UE4PlasticPluginDev/Content/FirstPersonBP/Blueprints/BP_TestsRenamed.uasset#cs:12</RevisionSpec>
-		  <Branch>Removed /Content/FirstPersonBP/Blueprints/BP_TestsRenamed.uasset</Branch>
+		  <Branch>/main/rename_test</Branch>
+		  <CreationDate>2022-04-28T16:00:37+02:00</CreationDate>
+		  <RevisionType>bin</RevisionType>
+		  <ChangesetNumber>12</ChangesetNumber>
+		  <Owner>sebastien.rombauts</Owner>
+		  <Comment>Renamed sphere blueprint</Comment>
+		  <Repository>UE4PlasticPluginDev</Repository>
+		  <Server>localhost:8087</Server>
+		  <RepositorySpec>UE4PlasticPluginDev@localhost:8087</RepositorySpec>
+		  <DataStatus>Available</DataStatus>
+		  <ItemPathOrSpec>C:/Workspace/UE4PlasticPluginDev/Content/FirstPersonBP/Blueprints/BP_TestsRenamed.uasset</ItemPathOrSpec>
+		  <ItemId>1657</ItemId>
+		  <Size>28603</Size>
+		  <Hash>MREVIZ1qKNqu1h2iq9WiRg==</Hash>
+		</Revision>
+		<Revision>
+		  <RevisionSpec>C:/Workspace/UE4PlasticPluginDev/Content/FirstPersonBP/Blueprints/BP_TestsRenamed.uasset#cs:12</RevisionSpec>
+		  <Branch>Moved from /Content/FirstPersonBP/Blueprints/BP_ToRename.uasset to /Content/FirstPersonBP/Blueprints/BP_TestsRenamed.uasset</Branch>
 		  <CreationDate>2022-04-28T16:00:37+02:00</CreationDate>
 		  <RevisionType />
 		  <ChangesetNumber>12</ChangesetNumber>
@@ -618,10 +676,13 @@ static FString DecodeXmlEntities(const FString& InString)
 		  <Repository>UE4PlasticPluginDev</Repository>
 		  <Server>localhost:8087</Server>
 		  <RepositorySpec>UE4PlasticPluginDev@localhost:8087</RepositorySpec>
-		  <Size>22406</Size>
-		  <Hash>uR7NdDRAyKqADdyAqh67Rg==</Hash>
+		  <DataStatus />
+		  <ItemPathOrSpec />
+		  <ItemId />
+		  <Size>0</Size>
+		  <Hash />
 		</Revision>
-
+		...
 	  </Revisions>
 	</RevisionHistory>
 	<RevisionHistory>
@@ -700,116 +761,124 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 		// Note: limit to last 100 changes, like Perforce
 		static const int32 MaxRevisions = 100;
 		const int32 MinIndex = FMath::Max(0, RevisionNodes.Num() - MaxRevisions);
-		for (int32 Index = RevisionNodes.Num() - 1; Index >= MinIndex; Index--)
+		bool bNextEntryIsAMove = false;
+		for (int32 RevisionIndex = RevisionNodes.Num() - 1; RevisionIndex >= MinIndex; RevisionIndex--)
 		{
-			if (const FXmlNode* RevisionNode = RevisionNodes[Index])
+			const FXmlNode* RevisionNode = RevisionNodes[RevisionIndex];
+			check(RevisionNode);
+
+			const TSharedRef<FUnityVersionControlRevision, ESPMode::ThreadSafe> SourceControlRevision = MakeShareable(new FUnityVersionControlRevision);
+			SourceControlRevision->State = &InOutState;
+			SourceControlRevision->Filename = Filename;
+
+			if (const FXmlNode* RevisionTypeNode = RevisionNode->FindChildNode(RevisionType))
 			{
-#if ENGINE_MAJOR_VERSION == 4
-				const TSharedRef<FUnityVersionControlRevision, ESPMode::ThreadSafe> SourceControlRevision = MakeShareable(new FUnityVersionControlRevision);
-#elif ENGINE_MAJOR_VERSION == 5
-				const TSharedRef<FUnityVersionControlRevision, ESPMode::ThreadSafe> SourceControlRevision = MakeShared<FUnityVersionControlRevision>();
-#endif
-				SourceControlRevision->State = &InOutState;
-				SourceControlRevision->Filename = Filename;
-
-				if (const FXmlNode* RevisionTypeNode = RevisionNode->FindChildNode(RevisionType))
+				// There are two entries for a Move of an asset;
+				// 1. a regular one with the normal data: revision, comment, branch, Id, size, hash etc.
+				// 2. and another "empty" one for the Move
+				// => Since the parsing is done in reverse order, the detection of a Move need to apply to the next entry
+				if (RevisionTypeNode->GetContent().IsEmpty())
 				{
-					if (!RevisionTypeNode->GetContent().IsEmpty())
+					// Empty RevisionType signals a Move: Raises a flag to treat the next entry as a Move, and skip this one as it is empty (it's just an additional entry with data for the move)
+					bNextEntryIsAMove = true;
+					continue;
+				}
+				else
+				{
+					if (bNextEntryIsAMove)
 					{
-						if (Index == 0)
-						{
-							SourceControlRevision->Action = FileStateToAction(EWorkspaceState::Added);
-						}
-						else
-						{
-							SourceControlRevision->Action = FileStateToAction(EWorkspaceState::CheckedOutChanged);
-						}
+						bNextEntryIsAMove = false;
+						SourceControlRevision->Action = SourceControlActionMoved;
+					}
+					else if (RevisionIndex == 0)
+					{
+						SourceControlRevision->Action = SourceControlActionAdded;
 					}
 					else
 					{
-						SourceControlRevision->Action = FileStateToAction(EWorkspaceState::Deleted);
+						SourceControlRevision->Action = SourceControlActionChanged;
 					}
 				}
+			}
 
-				if (const FXmlNode* ChangesetNumberNode = RevisionNode->FindChildNode(ChangesetNumber))
-				{
-					const FString& Changeset = ChangesetNumberNode->GetContent();
-					SourceControlRevision->ChangesetNumber = FCString::Atoi(*Changeset); // Value now used in the Revision column and in the Asset Menu History
+			if (const FXmlNode* ChangesetNumberNode = RevisionNode->FindChildNode(ChangesetNumber))
+			{
+				const FString& Changeset = ChangesetNumberNode->GetContent();
+				SourceControlRevision->ChangesetNumber = FCString::Atoi(*Changeset); // Value now used in the Revision column and in the Asset Menu History
 
-					// Also append depot name to the revision, but only when it is different from the default one (ie for xlinks sub repository)
-					if (!InOutState.RepSpec.IsEmpty() && (InOutState.RepSpec != RootRepSpec))
-					{
-						TArray<FString> RepSpecs;
-						InOutState.RepSpec.ParseIntoArray(RepSpecs, TEXT("@"));
-						SourceControlRevision->Revision = FString::Printf(TEXT("cs:%s@%s"), *Changeset, *RepSpecs[0]);
-					}
-					else
-					{
-						SourceControlRevision->Revision = FString::Printf(TEXT("cs:%s"), *Changeset);
-					}
-				}
-				if (const FXmlNode* CommentNode = RevisionNode->FindChildNode(Comment))
+				// Also append depot name to the revision, but only when it is different from the default one (ie for xlinks sub repository)
+				if (!InOutState.RepSpec.IsEmpty() && (InOutState.RepSpec != RootRepSpec))
 				{
-					SourceControlRevision->Description = DecodeXmlEntities(CommentNode->GetContent());
+					TArray<FString> RepSpecs;
+					InOutState.RepSpec.ParseIntoArray(RepSpecs, TEXT("@"));
+					SourceControlRevision->Revision = FString::Printf(TEXT("cs:%s@%s"), *Changeset, *RepSpecs[0]);
 				}
-				if (const FXmlNode* OwnerNode = RevisionNode->FindChildNode(Owner))
+				else
 				{
-					SourceControlRevision->UserName = UnityVersionControlUtils::UserNameToDisplayName(OwnerNode->GetContent());
+					SourceControlRevision->Revision = FString::Printf(TEXT("cs:%s"), *Changeset);
 				}
-				if (const FXmlNode* DateNode = RevisionNode->FindChildNode(CreationDate))
-				{
-					const FString& DateIso = DateNode->GetContent();
-					FDateTime::ParseIso8601(*DateIso, SourceControlRevision->Date);
-				}
-				if (const FXmlNode* BranchNode = RevisionNode->FindChildNode(Branch))
-				{
-					SourceControlRevision->Branch = DecodeXmlEntities(BranchNode->GetContent());
-				}
-				if (const FXmlNode* SizeNode = RevisionNode->FindChildNode(Size))
-				{
-					SourceControlRevision->FileSize = FCString::Atoi(*SizeNode->GetContent());
-				}
+			}
+			if (const FXmlNode* CommentNode = RevisionNode->FindChildNode(Comment))
+			{
+				SourceControlRevision->Description = DecodeXmlEntities(CommentNode->GetContent());
+			}
+			if (const FXmlNode* OwnerNode = RevisionNode->FindChildNode(Owner))
+			{
+				SourceControlRevision->UserName = UnityVersionControlUtils::UserNameToDisplayName(OwnerNode->GetContent());
+			}
+			if (const FXmlNode* DateNode = RevisionNode->FindChildNode(CreationDate))
+			{
+				const FString& DateIso = DateNode->GetContent();
+				FDateTime::ParseIso8601(*DateIso, SourceControlRevision->Date);
+			}
+			if (const FXmlNode* BranchNode = RevisionNode->FindChildNode(Branch))
+			{
+				SourceControlRevision->Branch = DecodeXmlEntities(BranchNode->GetContent());
+			}
+			if (const FXmlNode* SizeNode = RevisionNode->FindChildNode(Size))
+			{
+				SourceControlRevision->FileSize = FCString::Atoi(*SizeNode->GetContent());
+			}
 
-				// A negative RevisionHeadChangeset provided by fileinfo mean that the file has been unshelved;
-				// replace it by the changeset number of the first revision in the history (the more recent)
-				// Note: workaround to be able to show the history / the diff of a file that has been unshelved
-				// (but keeps the LocalRevisionChangeset to the negative changeset corresponding to the Shelve Id)
-				if (InOutState.DepotRevisionChangeset < 0)
-				{
-					InOutState.DepotRevisionChangeset = SourceControlRevision->ChangesetNumber;
-				}
+			// A negative RevisionHeadChangeset provided by fileinfo mean that the file has been unshelved;
+			// replace it by the changeset number of the first revision in the history (the more recent)
+			// Note: workaround to be able to show the history / the diff of a file that has been unshelved
+			// (but keeps the LocalRevisionChangeset to the negative changeset corresponding to the Shelve Id)
+			if (InOutState.DepotRevisionChangeset < 0)
+			{
+				InOutState.DepotRevisionChangeset = SourceControlRevision->ChangesetNumber;
+			}
 
-				// Detect and skip more recent changesets on other branches (ie above the RevisionHeadChangeset)
-				// since we usually don't want to display changes from other branches in the History window...
-				// except in case of a merge conflict, where the Editor expects the tip of the "source (remote)" branch to be at the top of the history!
-				if (   (SourceControlRevision->ChangesetNumber > InOutState.DepotRevisionChangeset)
+			// Detect and skip more recent changesets on other branches (ie above the RevisionHeadChangeset)
+			// since we usually don't want to display changes from other branches in the History window...
+			// except in case of a merge conflict, where the Editor expects the tip of the "source (remote)" branch to be at the top of the history!
+			if (   (SourceControlRevision->ChangesetNumber > InOutState.DepotRevisionChangeset)
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-					&& (SourceControlRevision->GetRevision() != InOutState.PendingResolveInfo.RemoteRevision))
+				&& (SourceControlRevision->GetRevision() != InOutState.PendingResolveInfo.RemoteRevision))
 #else
-					&& (SourceControlRevision->ChangesetNumber != InOutState.PendingMergeSourceChangeset))
+				&& (SourceControlRevision->ChangesetNumber != InOutState.PendingMergeSourceChangeset))
 #endif
-				{
-					InOutState.HeadBranch = SourceControlRevision->Branch;
-					InOutState.HeadAction = SourceControlRevision->Action;
-					InOutState.HeadChangeList = SourceControlRevision->ChangesetNumber;
-					InOutState.HeadUserName = SourceControlRevision->UserName;
-					InOutState.HeadModTime = SourceControlRevision->Date.ToUnixTimestamp();
-				}
-				else if (bInUpdateHistory)
-				{
-					InOutState.History.Add(SourceControlRevision);
-				}
+			{
+				InOutState.HeadBranch = SourceControlRevision->Branch;
+				InOutState.HeadAction = SourceControlRevision->Action;
+				InOutState.HeadChangeList = SourceControlRevision->ChangesetNumber;
+				InOutState.HeadUserName = SourceControlRevision->UserName;
+				InOutState.HeadModTime = SourceControlRevision->Date.ToUnixTimestamp();
+			}
+			else if (bInUpdateHistory)
+			{
+				InOutState.History.Add(SourceControlRevision);
+			}
 
-				// Also grab the UserName of the author of the current depot/head changeset
-				if ((SourceControlRevision->ChangesetNumber == InOutState.DepotRevisionChangeset) && InOutState.HeadUserName.IsEmpty())
-				{
-					InOutState.HeadUserName = SourceControlRevision->UserName;
-				}
+			// Also grab the UserName of the author of the current depot/head changeset
+			if ((SourceControlRevision->ChangesetNumber == InOutState.DepotRevisionChangeset) && InOutState.HeadUserName.IsEmpty())
+			{
+				InOutState.HeadUserName = SourceControlRevision->UserName;
+			}
 
-				if (!bInUpdateHistory)
-				{
-					break; // if not updating the history, just getting the head of the latest branch is enough
-				}
+			if (!bInUpdateHistory)
+			{
+				break; // if not updating the history, just getting the head of the latest branch is enough
 			}
 		}
 	}
@@ -817,14 +886,14 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 	return true;
 }
 
-bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InResults, TArray<FUnityVersionControlState>& InOutStates)
+bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InResultFilename, TArray<FUnityVersionControlState>& InOutStates)
 {
 	bool bResult = false;
 
 	FXmlFile XmlFile;
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseHistoryResults::FXmlFile::LoadFile);
-		bResult = XmlFile.LoadFile(InResults, EConstructMethod::ConstructFromBuffer);
+		bResult = XmlFile.LoadFile(InResultFilename);
 	}
 	if (bResult)
 	{
@@ -1317,7 +1386,7 @@ bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InR
 						return State.GetFilename().Equals(AbsoluteFilename);
 					}))
 				{
-					ExistingShelveRevision->Action = FileStateToAction(EWorkspaceState::Moved);
+					ExistingShelveRevision->Action = SourceControlActionMoved;
 					continue;
 				}
 			}

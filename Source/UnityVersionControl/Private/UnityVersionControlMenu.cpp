@@ -4,8 +4,10 @@
 
 #include "UnityVersionControlBranchesWindow.h"
 #include "UnityVersionControlModule.h"
-#include "UnityVersionControlProvider.h"
 #include "UnityVersionControlOperations.h"
+#include "UnityVersionControlProvider.h"
+#include "UnityVersionControlStyle.h"
+#include "UnityVersionControlUtils.h"
 #include "SUnityVersionControlStatusBar.h"
 
 #include "ISourceControlModule.h"
@@ -14,9 +16,10 @@
 
 #include "ContentBrowserMenuContexts.h"
 #include "Interfaces/IPluginManager.h"
-#include "Modules/ModuleManager.h"
+#include "HAL/PlatformProcess.h"
 #include "LevelEditor.h"
 #include "Misc/MessageDialog.h"
+#include "Modules/ModuleManager.h"
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
 #else
@@ -529,6 +532,21 @@ void FUnityVersionControlMenu::VisitLockRulesURLClicked(const FString InOrganiza
 	FPlatformProcess::LaunchURL(*OrganizationLockRulesURL, NULL, NULL);
 }
 
+void FUnityVersionControlMenu::OpenDeskoptApp() const
+{
+	const FString DesktopAppPath = UnityVersionControlUtils::FindDesktopApplicationPath();
+	const FString CommandLineArguments = FString::Printf(TEXT("--wk=\"%s\""), *FUnityVersionControlModule::Get().GetProvider().GetPathToWorkspaceRoot());
+
+	UE_LOG(LogSourceControl, Log, TEXT("Opening the Desktop application (%s %s)"), *DesktopAppPath, *CommandLineArguments);
+
+	FProcHandle Proc = FPlatformProcess::CreateProc(*DesktopAppPath, *CommandLineArguments, true, false, false, nullptr, 0, nullptr, nullptr, nullptr);
+	if (!Proc.IsValid())
+	{
+		UE_LOG(LogSourceControl, Error, TEXT("Opening the Desktop application (%s %s) failed."), *DesktopAppPath, *CommandLineArguments);
+		FPlatformProcess::CloseProc(Proc);
+	}
+}
+
 void FUnityVersionControlMenu::OpenBranchesWindow() const
 {
 	FUnityVersionControlModule::Get().GetBranchesWindow().OpenTab();
@@ -565,6 +583,8 @@ void FUnityVersionControlMenu::AddMenuExtension(FMenuBuilder& Menu)
 void FUnityVersionControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 #endif
 {
+	FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+
 	Menu.AddMenuEntry(
 #if ENGINE_MAJOR_VERSION == 5
 		"PlasticSync",
@@ -748,6 +768,29 @@ void FUnityVersionControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 			)
 		);
 	}
+
+	Menu.AddMenuEntry(
+#if ENGINE_MAJOR_VERSION == 5
+		"PlasticDesktopApp",
+		TAttribute<FText>::CreateLambda([&Provider]()
+			{
+				return Provider.IsPartialWorkspace() ? LOCTEXT("PlasticGluon", "Open in Gluon") : LOCTEXT("PlasticDesktopApp", "Open in Desktop App");
+			}),
+		TAttribute<FText>::CreateLambda([&Provider]()
+			{
+				return Provider.IsPartialWorkspace() ? LOCTEXT("PlasticDesktopAppTooltip", "Open the workspace in Unity Version Control Gluon Application.") : LOCTEXT("PlasticGluonTooltip", "Open the workspace in Unity Version Control Desktop Application.");
+			}),
+		TAttribute<FSlateIcon>::CreateLambda([&Provider]()
+			{
+				return FSlateIcon(FUnityVersionControlStyle::Get().GetStyleSetName(), Provider.IsPartialWorkspace() ? "UnityVersionControl.GluonIcon.Small" : "UnityVersionControl.PluginIcon.Small");
+			}),
+#else
+		Provider.IsPartialWorkspace() ? LOCTEXT("PlasticGluon", "Open in Gluon") : LOCTEXT("PlasticDesktopApp", "Open in Desktop App"),
+		Provider.IsPartialWorkspace() ? LOCTEXT("PlasticDesktopAppTooltip", "Open the workspace in Unity Version Control Gluon Application.") : LOCTEXT("PlasticGluonTooltip", "Open the workspace in Unity Version Control Desktop Application."),
+		FSlateIcon(FUnityVersionControlStyle::Get().GetStyleSetName(), Provider.IsPartialWorkspace() ? "UnityVersionControl.GluonIcon.Small" : "UnityVersionControl.PluginIcon.Small"),
+#endif
+		FUIAction(FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::OpenDeskoptApp))
+	);
 
 	AddViewBranches(Menu);
 }

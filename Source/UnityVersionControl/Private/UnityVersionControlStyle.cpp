@@ -45,6 +45,7 @@ TSharedRef<FSlateStyleSet> FUnityVersionControlStyle::Create()
 	Style->SetContentRoot(FUnityVersionControlModule::GetPlugin()->GetBaseDir() / TEXT("Resources"));
 
 	Style->Set("UnityVersionControl.PluginIcon.Small", new FSlateImageBrush(FUnityVersionControlStyle::InContent("Icon128", ".png"), Icon16x16));
+	Style->Set("UnityVersionControl.GluonIcon.Small", new FSlateImageBrush(FUnityVersionControlStyle::InContent("gluon", ".ico"), Icon16x16));
 
 	return Style;
 }

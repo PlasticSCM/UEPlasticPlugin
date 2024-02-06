@@ -63,6 +63,8 @@ private:
 	void OpenDialogWindow(TSharedPtr<SWindow>& InDialogWindowPtr);
 	void OnDialogClosed(const TSharedRef<SWindow>& InWindow);
 
+	FReply OnOpenBranchExplorerClicked();
+
 	void OnCreateBranchClicked(FString InParentBranchName);
 	void OnSwitchToBranchClicked(FString InBranchName);
 	void OnMergeBranchClicked(FString InBranchName);

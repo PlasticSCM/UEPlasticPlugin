@@ -7,24 +7,24 @@
 #include "UnityVersionControlStyle.h"
 #include "SUnityVersionControlBranchesWidget.h"
 
-#define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
+#define LOCTEXT_NAMESPACE "UnityVersionControlBranchesWindow"
 
-static const FName UnityVersionControlWindowTabName("UnityVersionControlWindow");
+static const FName UnityVersionControlBranchesWindowTabName("UnityVersionControlBranchesWindow");
 
 void FUnityVersionControlBranchesWindow::Register()
 {
 	FUnityVersionControlStyle::Initialize();
 	FUnityVersionControlStyle::ReloadTextures();
 
-	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(UnityVersionControlWindowTabName, FOnSpawnTab::CreateRaw(this, &FUnityVersionControlBranchesWindow::OnSpawnTab))
-		.SetDisplayName(LOCTEXT("UnityVersionControlWindowTabTitle", "View Branches"))
+	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(UnityVersionControlBranchesWindowTabName, FOnSpawnTab::CreateRaw(this, &FUnityVersionControlBranchesWindow::OnSpawnTab))
+		.SetDisplayName(LOCTEXT("UnityVersionControlBranchesWindowTabTitle", "View Branches"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden)
 		.SetIcon(FSlateIcon(FUnityVersionControlStyle::Get().GetStyleSetName(), "UnityVersionControl.PluginIcon.Small"));
 }
 
 void FUnityVersionControlBranchesWindow::Unregister()
 {
-	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(UnityVersionControlWindowTabName);
+	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(UnityVersionControlBranchesWindowTabName);
 
 	FUnityVersionControlStyle::Shutdown();
 }
@@ -40,7 +40,7 @@ TSharedRef<SDockTab> FUnityVersionControlBranchesWindow::OnSpawnTab(const FSpawn
 
 void FUnityVersionControlBranchesWindow::OpenTab()
 {
-	FGlobalTabmanager::Get()->TryInvokeTab(UnityVersionControlWindowTabName);
+	FGlobalTabmanager::Get()->TryInvokeTab(UnityVersionControlBranchesWindowTabName);
 }
 
 TSharedPtr<SWidget> FUnityVersionControlBranchesWindow::CreateBranchesWidget()

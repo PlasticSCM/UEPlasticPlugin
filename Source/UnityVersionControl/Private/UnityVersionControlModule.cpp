@@ -21,6 +21,7 @@ void FUnityVersionControlModule::StartupModule()
 
 	/// Register our tab Window here as it needs to be ready for the editor to reload at startup
 	UnityVersionControlBranchesWindow.Register();
+	UnityVersionControlLocksWindow.Register();
 }
 
 void FUnityVersionControlModule::ShutdownModule()
@@ -29,6 +30,7 @@ void FUnityVersionControlModule::ShutdownModule()
 	UnityVersionControlProvider.Close();
 
 	UnityVersionControlBranchesWindow.Unregister();
+	UnityVersionControlLocksWindow.Unregister();
 
 	// unbind provider from editor
 	IModularFeatures::Get().UnregisterModularFeature("SourceControl", &UnityVersionControlProvider);

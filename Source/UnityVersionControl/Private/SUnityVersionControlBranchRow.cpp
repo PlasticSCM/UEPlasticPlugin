@@ -14,7 +14,7 @@
 #include "EditorStyleSet.h"
 #endif
 
-#define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
+#define LOCTEXT_NAMESPACE "UnityVersionControlBranchesWindow"
 
 FName UnityVersionControlBranchesListViewColumn::Name::Id() { return TEXT("Name"); }
 FText UnityVersionControlBranchesListViewColumn::Name::GetDisplayText() { return LOCTEXT("Name_Column", "Name"); }

@@ -17,7 +17,7 @@
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/SBoxPanel.h"
 
-#define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
+#define LOCTEXT_NAMESPACE "UnityVersionControlBranchesWindow"
 
 void SUnityVersionControlCreateBranch::Construct(const FArguments& InArgs)
 {

@@ -4,6 +4,7 @@
 
 #include "UnityVersionControlBranch.h"
 #include "UnityVersionControlCommand.h"
+#include "UnityVersionControlLock.h"
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlParsers.h"
 #include "UnityVersionControlProjectSettings.h"
@@ -366,9 +367,31 @@ static bool RunStatus(const FString& InDir, TArray<FString>&& InFiles, const ESt
 	return bResult;
 }
 
-bool RunListSmartLocks(const FString& InRepository, TMap<FString, UnityVersionControlParsers::FSmartLockInfoParser>& OutSmartLocks)
+static TArray<FUnityVersionControlLockRef> LocksCache;
+static FDateTime LocksTimestamp;
+static FCriticalSection	LocksCriticalSection;
+
+void InvalidateLocksCache()
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlUtils::RunListSmartLocks);
+	FScopeLock Lock(&LocksCriticalSection);
+	LocksCache.Reset();
+	LocksTimestamp = FDateTime();
+}
+
+bool RunListLocks(const FString& InRepository, TArray<FUnityVersionControlLockRef>& OutLocks)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlUtils::RunListLocks);
+
+	// Cache Locks with a Timestamp, and an InvalidateCachedLocks() function
+	{
+		FScopeLock Lock(&LocksCriticalSection);
+		const FTimespan ElapsedTime = FDateTime::Now() - LocksTimestamp;
+		if (ElapsedTime.GetTotalSeconds() < 60.0)
+		{
+			OutLocks = LocksCache;
+			return true;
+		}
+	}
 
 	TArray<FString> Results;
 	TArray<FString> ErrorMessages;
@@ -376,22 +399,26 @@ bool RunListSmartLocks(const FString& InRepository, TMap<FString, UnityVersionCo
 	Parameters.Add(TEXT("list"));
 	Parameters.Add(TEXT("--machinereadable"));
 	Parameters.Add(TEXT("--smartlocks"));
+	Parameters.Add(FString::Printf(TEXT("--repository=%s"), *InRepository));
 	Parameters.Add(TEXT("--anystatus"));
 	Parameters.Add(TEXT("--fieldseparator=\"") FILE_STATUS_SEPARATOR TEXT("\""));
+	// NOTE: --dateformat was added to smartlocks a couple of releases later in version 11.0.16.8133
 	Parameters.Add(TEXT("--dateformat=yyyy-MM-ddTHH:mm:ss"));
 	bool bResult = RunCommand(TEXT("lock"), Parameters, TArray<FString>(), Results, ErrorMessages);
 
 	if (bResult)
 	{
+		OutLocks.Reserve(Results.Num());
 		for (int32 IdxResult = 0; IdxResult < Results.Num(); IdxResult++)
 		{
 			const FString& Result = Results[IdxResult];
-			UnityVersionControlParsers::FSmartLockInfoParser SmartLockInfoParser(Result);
-			if (SmartLockInfoParser.Repository == InRepository)
-			{
-				OutSmartLocks.Add(SmartLockInfoParser.Filename, SmartLockInfoParser);
-			}
+			FUnityVersionControlLock&& Lock = UnityVersionControlParsers::ParseLockInfo(Result);
+			OutLocks.Add(MakeShareable(new FUnityVersionControlLock(Lock)));
 		}
+
+		FScopeLock Lock(&LocksCriticalSection);
+		LocksCache = OutLocks;
+		LocksTimestamp = FDateTime::Now();
 	}
 
 	return bResult;
@@ -1131,14 +1158,20 @@ bool UpdateCachedStates(TArray<FUnityVersionControlState>&& InStates)
 	FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
 	const FDateTime Now = FDateTime::Now();
 
+	bool bUpdatedStates = false;
 	for (auto&& InState : InStates)
 	{
 		TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe> State = Provider.GetStateInternal(InState.LocalFilename);
+		// Only report that the cache was updated if the state changed in a meaningful way, useful to the Editor
+		if (*State != InState)
+		{
+			bUpdatedStates = true;
+		}
 		*State = MoveTemp(InState);
 		State->TimeStamp = Now;
 	}
 
-	return (InStates.Num() > 0);
+	return bUpdatedStates;
 }
 
 void RemoveRedundantErrors(FUnityVersionControlCommand& InCommand, const FString& InFilter)

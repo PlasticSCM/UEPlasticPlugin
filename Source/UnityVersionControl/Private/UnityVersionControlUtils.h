@@ -13,11 +13,7 @@ class FUnityVersionControlCommand;
 class FUnityVersionControlState;
 struct FSoftwareVersion;
 typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
-
-namespace UnityVersionControlParsers
-{
-class FSmartLockInfoParser;
-} // namespace UnityVersionControlParsers
+typedef TSharedRef<class FUnityVersionControlLock, ESPMode::ThreadSafe> FUnityVersionControlLockRef;
 
 enum class EWorkspaceState;
 
@@ -144,13 +140,18 @@ bool RunCheckConnection(FString& OutBranchName, FString& OutRepositoryName, FStr
 FString UserNameToDisplayName(const FString& InUserName);
 
 /**
+ * Invalidate the cache of locks so that the next call to RunListLocks() will not use it and actually run the cm lock list command
+ */
+void InvalidateLocksCache();
+
+/**
  * Run a Plastic "lock list" command and parse it.
  *
  * @param	InRepository		The repository to ask for the locks
- * @param	OutSmartLocks		The list of smart locks
+ * @param	OutLocks			The list of locks
  * @returns true if the command succeeded and returned no errors
  */
-bool RunListSmartLocks(const FString& InRepository, TMap<FString, UnityVersionControlParsers::FSmartLockInfoParser>& OutSmartLocks);
+bool RunListLocks(const FString& InRepository, TArray<FUnityVersionControlLockRef>& OutLocks);
 
 // Specify the "search type" for the "status" command
 enum class EStatusSearchType

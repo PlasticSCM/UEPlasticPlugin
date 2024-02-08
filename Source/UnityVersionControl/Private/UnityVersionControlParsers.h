@@ -7,6 +7,7 @@
 #include "Runtime/Launch/Resources/Version.h"
 
 class FUnityVersionControlChangelistState;
+class FUnityVersionControlLock;
 class FUnityVersionControlRevision;
 class FUnityVersionControlState;
 typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
@@ -14,19 +15,7 @@ typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnity
 namespace UnityVersionControlParsers
 {
 
-class FSmartLockInfoParser
-{
-public:
-	explicit FSmartLockInfoParser(const FString& InResult);
-
-	FString Repository;
-	int32 ItemId;
-	FDateTime Date;
-	FString BranchName;
-	FString Status;
-	FString Owner;
-	FString Filename;
-};
+FUnityVersionControlLock ParseLockInfo(const FString& InResult);
 
 class FPlasticMergeConflictParser
 {

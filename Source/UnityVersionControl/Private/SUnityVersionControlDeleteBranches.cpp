@@ -15,7 +15,7 @@
 #include "Widgets/Input/SEditableTextBox.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 
-#define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
+#define LOCTEXT_NAMESPACE "UnityVersionControlBranchesWindow"
 
 void SUnityVersionControlDeleteBranches::Construct(const FArguments& InArgs)
 {

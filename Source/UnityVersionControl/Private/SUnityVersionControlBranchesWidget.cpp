@@ -36,7 +36,7 @@
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Views/SHeaderRow.h"
 
-#define LOCTEXT_NAMESPACE "UnityVersionControlWindow"
+#define LOCTEXT_NAMESPACE "UnityVersionControlBranchesWindow"
 
 void SUnityVersionControlBranchesWidget::Construct(const FArguments& InArgs)
 {
@@ -258,7 +258,7 @@ void SUnityVersionControlBranchesWidget::OnHiddenColumnsListChanged()
 	if (BranchesListView && BranchesListView->GetHeaderRow())
 	{
 		UUnityVersionControlProjectSettings* Settings = GetMutableDefault<UUnityVersionControlProjectSettings>();
-		Settings->bShowBranchRepositoryColumn = false;
+		Settings->bShowBranchRepositoryColumn = true;
 		Settings->bShowBranchCreatedByColumn = true;
 		Settings->bShowBranchDateColumn = true;
 		Settings->bShowBranchCommentColumn = true;

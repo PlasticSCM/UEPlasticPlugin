@@ -20,6 +20,7 @@
 
 class FUnityVersionControlProvider;
 typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
+typedef TSharedRef<class FUnityVersionControlLock, ESPMode::ThreadSafe> FUnityVersionControlLockRef;
 
 
 /**
@@ -98,6 +99,22 @@ public:
 
 
 /**
+ * Internal operation to list locks, aka "cm lock list"
+*/
+class FPlasticGetLocks final : public FSourceControlOperationBase
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	// List of locks found
+	TArray<FUnityVersionControlLockRef> Locks;
+};
+
+
+/**
  * Internal operation used to release or remove Lock(s) on file(s)
 */
 class FPlasticUnlock final : public FSourceControlOperationBase
@@ -107,6 +124,9 @@ public:
 	virtual FName GetName() const override;
 
 	virtual FText GetInProgressString() const override;
+
+	// Locks to unlock, including the Item Id and branch name
+	TArray<FUnityVersionControlLockRef> Locks;
 
 	// Release the Lock(s), and optionally remove (delete) them completely
 	bool bRemove = false;
@@ -420,6 +440,23 @@ public:
 public:
 	/** Temporary states for results */
 	TArray<FUnityVersionControlState> States;
+};
+
+/** list locks. */
+class FPlasticGetLocksWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticGetLocksWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticGetLocksWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+
+	// Current branch the workspace is on (at the end of the operation)
+	FString CurrentBranchName;
 };
 
 /** release or remove Lock(s) on file(s). */

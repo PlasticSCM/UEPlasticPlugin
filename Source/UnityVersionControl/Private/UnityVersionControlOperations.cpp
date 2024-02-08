@@ -5,6 +5,7 @@
 #include "PackageUtils.h"
 #include "UnityVersionControlBranch.h"
 #include "UnityVersionControlCommand.h"
+#include "UnityVersionControlLock.h"
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlParsers.h"
 #include "UnityVersionControlProvider.h"
@@ -47,6 +48,7 @@ void IUnityVersionControlWorker::RegisterWorkers(FUnityVersionControlProvider& U
 	UnityVersionControlProvider.RegisterWorker("RevertUnchanged", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticRevertUnchangedWorker>));
 	UnityVersionControlProvider.RegisterWorker("RevertAll", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticRevertAllWorker>));
 	UnityVersionControlProvider.RegisterWorker("SwitchToPartialWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToPartialWorkspaceWorker>));
+	UnityVersionControlProvider.RegisterWorker("GetLocks", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetLocksWorker>));
 	UnityVersionControlProvider.RegisterWorker("Unlock", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticUnlockWorker>));
 	UnityVersionControlProvider.RegisterWorker("GetBranches", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetBranchesWorker>));
 	UnityVersionControlProvider.RegisterWorker("Switch", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSwitchToBranchWorker>));
@@ -131,6 +133,16 @@ FName FPlasticSwitchToPartialWorkspace::GetName() const
 FText FPlasticSwitchToPartialWorkspace::GetInProgressString() const
 {
 	return LOCTEXT("SourceControl_SwitchToPartialWorkspace", "Switching to a Partial/Gluon Workspace...");
+}
+
+FName FPlasticGetLocks::GetName() const
+{
+	return "GetLocks";
+}
+
+FText FPlasticGetLocks::GetInProgressString() const
+{
+	return LOCTEXT("SourceControl_GetLocks", "Getting the list of locks...");
 }
 
 FName FPlasticUnlock::GetName() const
@@ -345,6 +357,7 @@ bool FPlasticCheckOutWorker::Execute(FUnityVersionControlCommand& InCommand)
 	}
 
 	// now update the status of our files
+	UnityVersionControlUtils::InvalidateLocksCache();
 	UnityVersionControlUtils::RunUpdateStatus(InCommand.Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 
 	return InCommand.bCommandSuccessful;
@@ -483,6 +496,7 @@ bool FPlasticCheckInWorker::Execute(FUnityVersionControlCommand& InCommand)
 		}
 
 		// now update the status of our files
+		UnityVersionControlUtils::InvalidateLocksCache();
 		UnityVersionControlUtils::RunUpdateStatus(Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 	}
 	else
@@ -761,6 +775,7 @@ bool FPlasticRevertWorker::Execute(FUnityVersionControlCommand& InCommand)
 #if ENGINE_MAJOR_VERSION == 5
 	// update the status of our files: need to check for local changes in case of a SoftRevert
 	const UnityVersionControlUtils::EStatusSearchType SearchType = bIsSoftRevert ? UnityVersionControlUtils::EStatusSearchType::All : UnityVersionControlUtils::EStatusSearchType::ControlledOnly;
+	UnityVersionControlUtils::InvalidateLocksCache();
 	UnityVersionControlUtils::RunUpdateStatus(Files, SearchType, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 #endif
 
@@ -814,6 +829,7 @@ bool FPlasticRevertUnchangedWorker::Execute(FUnityVersionControlCommand& InComma
 	{
 		Files.Add(FPaths::ConvertRelativePathToFull(FPaths::ProjectContentDir()));
 	}
+	UnityVersionControlUtils::InvalidateLocksCache();
 	UnityVersionControlUtils::RunUpdateStatus(Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 
 	return InCommand.bCommandSuccessful;
@@ -911,6 +927,7 @@ bool FPlasticRevertAllWorker::Execute(FUnityVersionControlCommand& InCommand)
 	// now update the status of the updated files
 	if (Operation->UpdatedFiles.Num())
 	{
+		UnityVersionControlUtils::InvalidateLocksCache();
 		UnityVersionControlUtils::RunUpdateStatus(Operation->UpdatedFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 	}
 
@@ -1005,7 +1022,7 @@ bool FPlasticSwitchToPartialWorkspaceWorker::Execute(FUnityVersionControlCommand
 	{
 		TArray<FString> ProjectFiles;
 		ProjectFiles.Add(FPaths::ConvertRelativePathToFull(FPaths::GetProjectFilePath()));
-		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunUpdateStatus(ProjectFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
+		UnityVersionControlUtils::RunUpdateStatus(ProjectFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 	}
 
 	return InCommand.bCommandSuccessful;
@@ -1014,6 +1031,37 @@ bool FPlasticSwitchToPartialWorkspaceWorker::Execute(FUnityVersionControlCommand
 bool FPlasticSwitchToPartialWorkspaceWorker::UpdateStates()
 {
 	return UnityVersionControlUtils::UpdateCachedStates(MoveTemp(States));
+}
+
+FName FPlasticGetLocksWorker::GetName() const
+{
+	return "GetLocks";
+}
+
+bool FPlasticGetLocksWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetLocksWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticGetLocks, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticGetLocks>(InCommand.Operation);
+
+	{
+		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunListLocks(GetProvider().GetRepositoryName(), Operation->Locks);
+	}
+
+	{
+		FString RepositoryName, ServerUrl;
+		InCommand.bCommandSuccessful &= UnityVersionControlUtils::GetWorkspaceInfo(CurrentBranchName, RepositoryName, ServerUrl, InCommand.ErrorMessages);
+	}
+
+	return InCommand.bCommandSuccessful;
+}
+
+bool FPlasticGetLocksWorker::UpdateStates()
+{
+	GetProvider().SetBranchName(CurrentBranchName);
+
+	return false;
 }
 
 FName FPlasticUnlockWorker::GetName() const
@@ -1028,29 +1076,48 @@ bool FPlasticUnlockWorker::Execute(FUnityVersionControlCommand& InCommand)
 	check(InCommand.Operation->GetName() == GetName());
 	TSharedRef<FPlasticUnlock, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticUnlock>(InCommand.Operation);
 
+	if (!Operation->Locks.IsEmpty())
 	{
-		// retrieve the itemid of assets to unlock
-		FString ItemIds;
-		for (const FString& File : InCommand.Files)
+		// The View Locks window works with object specs using ItemIds and Branch names
+		// The unlock operation works on a per-branch basis when multiple Lock destinations are involved
+		TArray<FString> Branches;
+		Branches.Reserve(Operation->Locks.Num());
+		for (const FUnityVersionControlLockRef& Lock : Operation->Locks)
 		{
-			const auto State = GetProvider().GetStateInternal(File);
-			if (State->LockedId != ISourceControlState::INVALID_REVISION)
-			{
-				ItemIds += FString::Printf(TEXT("itemid:%d "), State->LockedId);
-			}
+			Branches.AddUnique(Lock->Branch);
 		}
+		for (const FString& Branch : Branches)
+		{
+			TArray<FString> Parameters;
+			Parameters.Add(TEXT("unlock"));
+			if (Operation->bRemove)
+				Parameters.Add(TEXT("--remove"));
 
+			Parameters.Add(FString::Printf(TEXT("--branch=%s"), *Branch));
+			for (const FUnityVersionControlLockRef& Lock : Operation->Locks)
+			{
+				if (Lock->Branch == Branch)
+				{
+					Parameters.Add(FString::Printf(TEXT("itemid:%d "), Lock->ItemId));
+				}
+			}
+			InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("lock"), Parameters, TArray<FString>(), InCommand.InfoMessages, InCommand.ErrorMessages);
+		}
+	}
+	else
+	{
 		TArray<FString> Parameters;
 		Parameters.Add(TEXT("unlock"));
 		if (Operation->bRemove)
 			Parameters.Add(TEXT("--remove"));
-		Parameters.Add(ItemIds);
-		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("lock"), Parameters, TArray<FString>(), InCommand.InfoMessages, InCommand.ErrorMessages);
+
+		// But the context "Unlock" menu only deals with filenames (Asset Paths given by Content Browser)
+		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("lock"), Parameters, InCommand.Files, InCommand.InfoMessages, InCommand.ErrorMessages);
 	}
 
-	{
-		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunUpdateStatus(InCommand.Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
-	}
+	// now update the status of our files
+	UnityVersionControlUtils::InvalidateLocksCache();
+	UnityVersionControlUtils::RunUpdateStatus(InCommand.Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 
 	return InCommand.bCommandSuccessful;
 }
@@ -1112,7 +1179,7 @@ bool FPlasticSwitchToBranchWorker::Execute(FUnityVersionControlCommand& InComman
 	{
 		// the current branch is used to asses the status of Retained Locks
 		GetProvider().SetBranchName(Operation->BranchName);
-		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunUpdateStatus(Operation->UpdatedFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
+		UnityVersionControlUtils::RunUpdateStatus(Operation->UpdatedFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 	}
 
 	return InCommand.bCommandSuccessful;
@@ -1141,7 +1208,8 @@ bool FPlasticMergeBranchWorker::Execute(FUnityVersionControlCommand& InCommand)
 	// now update the status of the updated files
 	if (Operation->UpdatedFiles.Num())
 	{
-		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunUpdateStatus(Operation->UpdatedFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
+		UnityVersionControlUtils::InvalidateLocksCache();
+		UnityVersionControlUtils::RunUpdateStatus(Operation->UpdatedFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 	}
 
 	return InCommand.bCommandSuccessful;
@@ -1466,6 +1534,7 @@ bool FPlasticCopyWorker::Execute(FUnityVersionControlCommand& InCommand)
 		TArray<FString> BothFiles;
 		BothFiles.Add(Origin);
 		BothFiles.Add(Destination);
+		UnityVersionControlUtils::InvalidateLocksCache();
 		UnityVersionControlUtils::RunUpdateStatus(BothFiles, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 	}
 	else
@@ -1557,6 +1626,7 @@ bool FPlasticResolveWorker::Execute(FUnityVersionControlCommand& InCommand)
 	}
 
 	// now update the status of our files
+	UnityVersionControlUtils::InvalidateLocksCache();
 	UnityVersionControlUtils::RunUpdateStatus(InCommand.Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 
 	return InCommand.bCommandSuccessful;
@@ -2353,6 +2423,7 @@ bool FPlasticUnshelveWorker::Execute(FUnityVersionControlCommand& InCommand)
 	if (InCommand.bCommandSuccessful)
 	{
 		// now update the status of our files
+		UnityVersionControlUtils::InvalidateLocksCache();
 		UnityVersionControlUtils::RunUpdateStatus(InCommand.Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 
 		ChangelistToUpdate = InCommand.Changelist;

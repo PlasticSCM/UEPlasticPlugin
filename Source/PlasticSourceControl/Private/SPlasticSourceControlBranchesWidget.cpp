@@ -21,9 +21,13 @@
 #include "ToolMenuContext.h"
 
 #include "Misc/ComparisonUtility.h"
+#include "Misc/MessageDialog.h"
 #include "Styling/AppStyle.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Docking/TabManager.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SSearchBox.h"
+#include "Widgets/Layout/SSpacer.h"
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/SWindow.h"
 #include "Widgets/Text/STextBlock.h"

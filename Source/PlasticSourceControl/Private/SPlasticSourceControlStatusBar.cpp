@@ -7,7 +7,10 @@
 #include "Styling/AppStyle.h"
 #include "Input/Reply.h"
 #include "Styling/SlateTypes.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SButton.h"
+#include "Widgets/Text/STextBlock.h"
+#include "Widgets/SBoxPanel.h"
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
 

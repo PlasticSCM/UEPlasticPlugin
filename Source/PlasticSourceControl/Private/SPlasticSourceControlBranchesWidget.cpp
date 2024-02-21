@@ -499,9 +499,9 @@ TArray<FString> SPlasticSourceControlBranchesWidget::GetSelectedBranches()
 {
 	TArray<FString> SelectedBranches;
 
-	for (const FPlasticSourceControlBranchPtr& BranchPtr : BranchesListView->GetSelectedItems())
+	for (const FPlasticSourceControlBranchRef& BranchRef : BranchesListView->GetSelectedItems())
 	{
-		SelectedBranches.Add(BranchPtr->Name);
+		SelectedBranches.Add(BranchRef->Name);
 	}
 
 	return SelectedBranches;

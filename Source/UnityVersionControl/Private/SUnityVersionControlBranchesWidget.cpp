@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #include "SUnityVersionControlBranchesWidget.h"
 
@@ -24,17 +24,21 @@
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 #include "Misc/ComparisonUtility.h"
 #endif
+#include "Misc/MessageDialog.h"
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
 #else
 #include "EditorStyleSet.h"
 #endif
+#include "Framework/Application/SlateApplication.h"
+#include "Framework/Docking/TabManager.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SSearchBox.h"
-#include "Widgets/SBoxPanel.h"
-#include "Widgets/SWindow.h"
+#include "Widgets/Layout/SSpacer.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Views/SHeaderRow.h"
+#include "Widgets/SBoxPanel.h"
+#include "Widgets/SWindow.h"
 
 #define LOCTEXT_NAMESPACE "UnityVersionControlBranchesWindow"
 
@@ -522,9 +526,9 @@ TArray<FString> SUnityVersionControlBranchesWidget::GetSelectedBranches()
 {
 	TArray<FString> SelectedBranches;
 
-	for (const FUnityVersionControlBranchPtr& BranchPtr : BranchesListView->GetSelectedItems())
+	for (const FUnityVersionControlBranchRef& BranchRef : BranchesListView->GetSelectedItems())
 	{
-		SelectedBranches.Add(BranchPtr->Name);
+		SelectedBranches.Add(BranchRef->Name);
 	}
 
 	return SelectedBranches;

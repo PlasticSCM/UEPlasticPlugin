@@ -2,6 +2,7 @@
 
 #include "UnityVersionControlLocksWindow.h"
 
+#include "Framework/Docking/TabManager.h"
 #include "Widgets/Docking/SDockTab.h"
 
 #include "UnityVersionControlStyle.h"

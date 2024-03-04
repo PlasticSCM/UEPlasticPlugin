@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #include "SUnityVersionControlSettings.h"
 #include "UnityVersionControlOperations.h"
@@ -18,8 +18,8 @@
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SSeparator.h"
-#include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
+#include "Widgets/SBoxPanel.h"
 #include "Runtime/Launch/Resources/Version.h"
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"

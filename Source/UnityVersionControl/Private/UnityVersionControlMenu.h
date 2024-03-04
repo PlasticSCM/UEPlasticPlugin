@@ -1,10 +1,11 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "ISourceControlProvider.h"
 #include "Notification.h"
+#include "AssetRegistry/AssetData.h"
 #include "Runtime/Launch/Resources/Version.h"
 
 class FMenuBuilder;

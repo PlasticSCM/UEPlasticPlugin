@@ -1,8 +1,9 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AssetRegistry/AssetData.h"
 
 namespace PackageUtils
 {

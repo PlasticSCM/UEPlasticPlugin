@@ -1,7 +1,8 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #include "UnityVersionControlBranchesWindow.h"
 
+#include "Framework/Docking/TabManager.h"
 #include "Widgets/Docking/SDockTab.h"
 
 #include "UnityVersionControlStyle.h"

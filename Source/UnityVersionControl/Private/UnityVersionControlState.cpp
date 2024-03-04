@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #include "UnityVersionControlState.h"
 #include "UnityVersionControlProjectSettings.h"
@@ -498,9 +498,9 @@ FText FUnityVersionControlState::GetDisplayTooltip() const
 	case EWorkspaceState::Controlled:
 		return FText();
 	case EWorkspaceState::CheckedOutChanged:
-		return LOCTEXT("CheckedOut_Tooltip", "Checked-out (changed)");
+		return LOCTEXT("CheckedOutChanged_Tooltip", "Checked-out (changed)");
 	case EWorkspaceState::CheckedOutUnchanged:
-		return LOCTEXT("CheckedOut_Tooltip", "Checked-out (unchanged)");
+		return LOCTEXT("CheckedOutUnchanged_Tooltip", "Checked-out (unchanged)");
 	case EWorkspaceState::Added:
 		return LOCTEXT("Added_Tooltip", "Added");
 	case EWorkspaceState::Moved:

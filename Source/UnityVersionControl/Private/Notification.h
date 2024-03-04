@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #pragma once
 
@@ -28,11 +28,9 @@ public:
 	static void DisplayResult(const FSourceControlOperationBase& InOperation, ECommandResult::Type InResult);
 
 	static void DisplaySuccess(const FSourceControlOperationBase& InOperation);
-	static void DisplaySuccess(const FName& InOperationName);
 	static void DisplaySuccess(const FText& InNotificationText);
 
 	static void DisplayFailure(const FSourceControlOperationBase& InOperation);
-	static void DisplayFailure(const FName& InOperationName);
 	static void DisplayFailure(const FText& InNotificationText);
 
 private:

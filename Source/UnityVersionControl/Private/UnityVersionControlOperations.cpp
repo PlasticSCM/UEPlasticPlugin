@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #include "UnityVersionControlOperations.h"
 
@@ -977,8 +977,15 @@ bool FPlasticMakeWorkspaceWorker::Execute(FUnityVersionControlCommand& InCommand
 		TArray<FString> Parameters;
 		Parameters.Add(Operation->ServerUrl);
 		Parameters.Add(Operation->RepositoryName);
-		UnityVersionControlUtils::RunCommand(TEXT("makerepository"), Parameters, TArray<FString>(), InCommand.InfoMessages, InCommand.ErrorMessages);
+		// Note: the whole operation should fail entirely if the repository creation failed (if the repository already exists, if the organization name is invalid, credential, autorizations etc.)
+		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("makerepository"), Parameters, TArray<FString>(), InCommand.InfoMessages, InCommand.ErrorMessages);
+		// Specifically detect the specific error when the organization name is invalid, and add an more human readable message.
+		if (InCommand.ErrorMessages.Contains(TEXT("Can't resolve DNS entry for cloud.plasticscm.com")))
+		{
+			InCommand.ErrorMessages.Add(TEXT("Invalid cloud organization name."));
+		}
 	}
+	if (InCommand.bCommandSuccessful)
 	{
 		TArray<FString> Parameters;
 		Parameters.Add(Operation->WorkspaceName);
@@ -986,7 +993,7 @@ bool FPlasticMakeWorkspaceWorker::Execute(FUnityVersionControlCommand& InCommand
 		Parameters.Add(FString::Printf(TEXT("--repository=rep:%s@repserver:%s"), *Operation->RepositoryName, *Operation->ServerUrl));
 		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("makeworkspace"), Parameters, TArray<FString>(), InCommand.InfoMessages, InCommand.ErrorMessages);
 	}
-	if (Operation->bPartialWorkspace)
+	if (InCommand.bCommandSuccessful && Operation->bPartialWorkspace)
 	{
 		TArray<FString> Parameters;
 		Parameters.Add(TEXT("update"));
@@ -1076,7 +1083,7 @@ bool FPlasticUnlockWorker::Execute(FUnityVersionControlCommand& InCommand)
 	check(InCommand.Operation->GetName() == GetName());
 	TSharedRef<FPlasticUnlock, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticUnlock>(InCommand.Operation);
 
-	if (!Operation->Locks.IsEmpty())
+	if (Operation->Locks.Num() > 0)
 	{
 		// The View Locks window works with object specs using ItemIds and Branch names
 		// The unlock operation works on a per-branch basis when multiple Lock destinations are involved

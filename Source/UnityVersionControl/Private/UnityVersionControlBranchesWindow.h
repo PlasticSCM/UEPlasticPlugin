@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #pragma once
 
@@ -16,5 +16,5 @@ public:
 private:
 	TSharedRef<class SDockTab> OnSpawnTab(const class FSpawnTabArgs& SpawnTabArgs);
 
-	TSharedPtr<SWidget> CreateBranchesWidget();
+	TSharedPtr<class SWidget> CreateBranchesWidget();
 };

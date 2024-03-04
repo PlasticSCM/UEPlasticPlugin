@@ -1,10 +1,11 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #pragma once
 
 #include "CoreMinimal.h"
 
 #include "Widgets/DeclarativeSyntaxSupport.h"
+#include "Widgets/Views/SListView.h"
 #include "Widgets/Views/STableRow.h"
 #include "Widgets/Views/STableViewBase.h"
 

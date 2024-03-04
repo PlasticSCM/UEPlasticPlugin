@@ -1,4 +1,4 @@
-// Copyright (c) 2023 Unity Technologies
+// Copyright (c) 2024 Unity Technologies
 
 #include "UnityVersionControlParsers.h"
 
@@ -11,6 +11,7 @@
 #include "UnityVersionControlVersions.h"
 #include "ISourceControlModule.h"
 
+#include "HAL/PlatformFile.h"
 #include "Misc/Paths.h"
 #include "XmlParser.h"
 
@@ -58,7 +59,7 @@ bool ParseProfileInfo(TArray<FString>& InResults, const FString& InServerUrl, FS
  *                                        or "Branch /main@UE5PlasticPluginDev@test@cloud" (when connected to the cloud)
  *                                        or "Branch /main@rep:UE5OpenWorldPerfTest@repserver:test@cloud"
  *                                        or "Changeset 1234@UE5PlasticPluginDev@test@cloud" (when the workspace is switched on a changeset instead of a branch)
-*/ 
+*/
 bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl)
 {
 	if (InResults.Num() == 0)
@@ -266,7 +267,7 @@ static FUnityVersionControlState StateFromStatusResult(const FString& InResult, 
  * @brief Parse status results in case of a regular operation for a list of files (not for a whole directory).
  *
  * This is the most common scenario, for any operation from the Content Browser or the View Changes window.
- * 
+ *
  * In this case, iterates on the list of files the Editor provides,
  * searching corresponding file status from the array of strings results of a "status" command.
  *
@@ -495,7 +496,7 @@ public:
 /**
  * Find the locks matching the file path from the list of locks
  *
- * Multiple matching locks can only happen if multiple destination branches are configured 
+ * Multiple matching locks can only happen if multiple destination branches are configured
 */
 TArray<FUnityVersionControlLockRef> FindMatchingLocks(const TArray<FUnityVersionControlLockRef>& InLocks, const FString& InPath)
 {
@@ -565,7 +566,9 @@ void ParseFileinfoResults(const TArray<FString>& InResults, TArray<FUnityVersion
 			{
 				ConcatStrings(FileState.LockedBy, TEXT(", "), Lock->Owner);
 			}
-			else
+			// Considers a "Retained" lock as meaningful only if it is retained on another branch
+			// NOTE: this is required to avoid the Unreal Editor showing a popup warning preventing the user to save the asset
+			else if (Lock->Branch != BranchName)
 			{
 				ConcatStrings(FileState.RetainedBy, TEXT(", "), Lock->Owner);
 			}
@@ -667,7 +670,7 @@ static FString DecodeXmlEntities(const FString& InString)
 
 /**
  * Parse results of the 'cm history --moveddeleted --xml --encoding="utf-8"' command.
- * 
+ *
  * Results of the history command looks like that:
 <RevisionHistoriesResult>
   <RevisionHistories>
@@ -951,7 +954,7 @@ bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InResultFil
 }
 
 /* Parse results of the 'cm update --xml=tempfile.xml --encoding="utf-8"' command.
- * 
+ *
  * Results of the update command looks like that:
 <UpdatedItems>
   <List>

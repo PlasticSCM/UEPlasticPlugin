@@ -17,7 +17,6 @@
 typedef TSharedRef<class FUnityVersionControlLock, ESPMode::ThreadSafe> FUnityVersionControlLockRef;
 
 class SSearchBox;
-class SWindow;
 
 // Widget displaying the list of locks in the tab window, see FUnityVersionControlLocksWindow
 class SUnityVersionControlLocksWidget : public SCompoundWidget

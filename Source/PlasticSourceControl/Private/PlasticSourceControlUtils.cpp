@@ -65,7 +65,7 @@ FString FindPlasticBinaryPath()
 #endif
 }
 
-FString FindDesktopApplicationPath()
+static FString FindDesktopApplicationPath()
 {
 	FString DesktopAppPath;
 
@@ -91,6 +91,21 @@ FString FindDesktopApplicationPath()
 #endif
 
 	return DesktopAppPath;
+}
+
+void OpenDesktopApplication(const bool bInBranchExplorer)
+{
+	const FString DesktopAppPath = FindDesktopApplicationPath();
+	const FString CommandLineArguments = FString::Printf(TEXT("--wk=\"%s\"%s"), *FPlasticSourceControlModule::Get().GetProvider().GetPathToWorkspaceRoot(), bInBranchExplorer ? TEXT(" --view=BranchExplorerView") : TEXT(""));
+
+	UE_LOG(LogSourceControl, Log, TEXT("Opening the Desktop application (%s %s)"), *DesktopAppPath, *CommandLineArguments);
+
+	FProcHandle Proc = FPlatformProcess::CreateProc(*DesktopAppPath, *CommandLineArguments, true, false, false, nullptr, 0, nullptr, nullptr, nullptr);
+	if (!Proc.IsValid())
+	{
+		UE_LOG(LogSourceControl, Error, TEXT("Opening the Desktop application (%s %s) failed."), *DesktopAppPath, *CommandLineArguments);
+		FPlatformProcess::CloseProc(Proc);
+	}
 }
 
 // Find the root of the workspace, looking from the provided path and upward in its parent directories.

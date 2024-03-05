@@ -51,9 +51,11 @@ bool RunCommand(const FString& InCommand, const TArray<FString>& InParameters, c
 FString FindPlasticBinaryPath();
 
 /**
- * Find the path to the Desktop Application: uses the registry on Windows.
+ * Open the Desktop Application.
+ *
+ * @param	bInBranchExplorer	Should it open the Branch Explorer instead of the Workspace Explorer (false by default)?
  */
-FString FindDesktopApplicationPath();
+void OpenDesktopApplication(const bool bInBranchExplorer = false);
 
 /**
  * Find the root of the Plastic workspace, looking from the GameDir and upward in its parent directories

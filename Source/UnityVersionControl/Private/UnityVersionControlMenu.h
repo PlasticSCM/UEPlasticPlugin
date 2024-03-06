@@ -11,6 +11,8 @@
 class FMenuBuilder;
 struct FToolMenuSection;
 
+typedef TSharedRef<class FUnityVersionControlLock, ESPMode::ThreadSafe> FUnityVersionControlLockRef;
+
 /** Unity Version Control extension of the Source Control toolbar menu */
 class FUnityVersionControlMenu
 {
@@ -59,11 +61,11 @@ private:
 	/** Called to generate concert asset context menu. */
 	void GeneratePlasticAssetContextMenu(FMenuBuilder& MenuBuilder, TArray<FAssetData> InAssetObjectPaths);
 
-	bool CanRemoveLocks(TArray<FAssetData> InAssetObjectPaths) const;
-	bool CanReleaseLocks(TArray<FAssetData> InAssetObjectPaths) const;
-	void ExecuteRemoveLocks(TArray<FAssetData> InAssetObjectPaths);
-	void ExecuteReleaseLocks(TArray<FAssetData> InAssetObjectPaths);
-	void ExecuteUnlock(const TArray<FAssetData>& InAssetObjectPaths, const bool bInRemove);
+	bool CanRemoveLocks(TArray<FUnityVersionControlLockRef> InSelectedLocks) const;
+	bool CanReleaseLocks(TArray<FUnityVersionControlLockRef> InSelectedLocks) const;
+	void ExecuteRemoveLocks(TArray<FUnityVersionControlLockRef> InSelectedLocks);
+	void ExecuteReleaseLocks(TArray<FUnityVersionControlLockRef> InSelectedLocks);
+	void ExecuteUnlock(TArray<FUnityVersionControlLockRef>&& InSelectedLocks, const bool bInRemove);
 
 private:
 	/** Tracks if the menu extension has been registered with the editor or not */

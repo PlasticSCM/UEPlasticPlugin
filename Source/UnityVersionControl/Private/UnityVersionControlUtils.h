@@ -10,6 +10,7 @@
 
 class FUnityVersionControlChangelistState;
 class FUnityVersionControlCommand;
+class FUnityVersionControlProvider;
 class FUnityVersionControlState;
 struct FSoftwareVersion;
 typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
@@ -103,7 +104,7 @@ FString GetProfileUserName(const FString& InServerUrl);
 
 /**
  * Get workspace name
- * @param	InWorkspaceRoot		The workspace from where to run the command - usually the Game directory
+ * @param	InWorkspaceRoot		The workspace from where to run the command - typically the Project path
  * @param	OutWorkspaceName	Name of the current workspace
  * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
 */
@@ -147,11 +148,29 @@ void InvalidateLocksCache();
 /**
  * Run a Plastic "lock list" command and parse it.
  *
- * @param	InRepository		The repository to ask for the locks
- * @param	OutLocks			The list of locks
+ * @param	InProvider				The source control provider to get the repository and current branch to ask the locks for
+ * @param   bInForAllDestBranches	Retrieve locks for all destination branches, or restrict them to only those applying to the working branch
+ * @param	OutLocks				The list of locks
  * @returns true if the command succeeded and returned no errors
  */
-bool RunListLocks(const FString& InRepository, TArray<FUnityVersionControlLockRef>& OutLocks);
+bool RunListLocks(const FUnityVersionControlProvider& InProvider, const bool bInForAllDestBranches, TArray<FUnityVersionControlLockRef>& OutLocks);
+
+/**
+ * Get locks applying to the working branch for the specified files.
+ *
+ * @param	InProvider			The source control provider to get the repository and current branch to ask the locks for
+ * @param	InFiles				The files to be operated on (server paths)
+ * @return	OutLocks			The list of corresponding locks if any
+ */
+TArray<FUnityVersionControlLockRef> GetLocksForWorkingBranch(const FUnityVersionControlProvider& InProvider, const TArray<FString>& InFiles);
+
+/**
+ * Get the list of filenames from the list of locks
+ * @param	InWorkspaceRoot		The workspace from where to run the command - typically the Project path
+ * @param	InLocks				Locks to get the file names for
+ * @return	List of absolute filenames
+*/
+TArray<FString> LocksToFileNames(const FString InWorkspaceRoot, const TArray<FUnityVersionControlLockRef>& InLocks);
 
 // Specify the "search type" for the "status" command
 enum class EStatusSearchType

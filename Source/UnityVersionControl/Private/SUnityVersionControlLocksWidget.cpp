@@ -601,22 +601,6 @@ void SUnityVersionControlLocksWidget::OnRemoveLocksClicked(TArray<FUnityVersionC
 	ExecuteUnlock(MoveTemp(InSelectedLocks), true);
 }
 
-TArray<FString> LocksToFileNames(const TArray<FUnityVersionControlLockRef>& InSelectedLocks)
-{
-	TArray<FString> Files;
-
-	// Note: remove the slash '/' from the end of the Workspace root to Combine it with server paths also starting with a slash
-	const FString WorkspaceRoot = FUnityVersionControlModule::Get().GetProvider().GetPathToWorkspaceRoot().LeftChop(1);
-
-	Files.Reserve(InSelectedLocks.Num());
-	for (const FUnityVersionControlLockRef& SelectedLock : InSelectedLocks)
-	{
-		Files.AddUnique(FPaths::Combine(WorkspaceRoot, SelectedLock->Path));
-	}
-
-	return Files;
-}
-
 void SUnityVersionControlLocksWidget::ExecuteUnlock(TArray<FUnityVersionControlLockRef>&& InSelectedLocks, const bool bInRemove)
 {
 	const FText UnlockQuestion = FText::Format(bInRemove ?
@@ -638,7 +622,8 @@ void SUnityVersionControlLocksWidget::ExecuteUnlock(TArray<FUnityVersionControlL
 		{
 			// Launch a custom "Unlock" operation
 			FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-			const TArray<FString> Files = LocksToFileNames(InSelectedLocks);
+			const FString& WorkspaceRoot = Provider.GetPathToWorkspaceRoot();
+			const TArray<FString> Files = UnityVersionControlUtils::LocksToFileNames(WorkspaceRoot, InSelectedLocks);
 			TSharedRef<FPlasticUnlock, ESPMode::ThreadSafe> UnlockOperation = ISourceControlOperation::Create<FPlasticUnlock>();
 			UnlockOperation->bRemove = bInRemove;
 			UnlockOperation->Locks = MoveTemp(InSelectedLocks);

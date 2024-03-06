@@ -2,6 +2,7 @@
 
 #include "UnityVersionControlMenu.h"
 
+#include "UnityVersionControlLock.h"
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlOperations.h"
 #include "UnityVersionControlProvider.h"
@@ -188,6 +189,10 @@ void FUnityVersionControlMenu::ExtendAssetContextMenu()
 
 void FUnityVersionControlMenu::GeneratePlasticAssetContextMenu(FMenuBuilder& MenuBuilder, TArray<FAssetData> InAssetObjectPaths)
 {
+	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+	const TArray<FString> Files = PackageUtils::AssetDataToFileNames(InAssetObjectPaths);
+	const TArray<FUnityVersionControlLockRef> SelectedLocks = UnityVersionControlUtils::GetLocksForWorkingBranch(Provider, Files);
+
 	MenuBuilder.BeginSection("AssetPlasticActions", LOCTEXT("UnityVersionControlAssetContextLocksMenuHeading", "Unity Version Control Locks"));
 
 	{
@@ -200,8 +205,8 @@ void FUnityVersionControlMenu::GeneratePlasticAssetContextMenu(FMenuBuilder& Men
 			FSlateIcon(FEditorStyle::GetStyleSetName(), "PropertyWindow.Unlocked"),
 #endif
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::ExecuteReleaseLocks, InAssetObjectPaths),
-				FCanExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::CanReleaseLocks, InAssetObjectPaths)
+				FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::ExecuteReleaseLocks, SelectedLocks),
+				FCanExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::CanReleaseLocks, SelectedLocks)
 			)
 		);
 	}
@@ -216,8 +221,8 @@ void FUnityVersionControlMenu::GeneratePlasticAssetContextMenu(FMenuBuilder& Men
 			FSlateIcon(FEditorStyle::GetStyleSetName(), "PropertyWindow.Unlocked"),
 #endif
 			FUIAction(
-				FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::ExecuteRemoveLocks, InAssetObjectPaths),
-				FCanExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::CanRemoveLocks, InAssetObjectPaths)
+				FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::ExecuteRemoveLocks, SelectedLocks),
+				FCanExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::CanRemoveLocks, SelectedLocks)
 			)
 		);
 	}
@@ -243,16 +248,12 @@ void FUnityVersionControlMenu::GeneratePlasticAssetContextMenu(FMenuBuilder& Men
 	MenuBuilder.EndSection();
 }
 
-bool FUnityVersionControlMenu::CanReleaseLocks(TArray<FAssetData> InAssetObjectPaths) const
+bool FUnityVersionControlMenu::CanReleaseLocks(TArray<FUnityVersionControlLockRef> InSelectedLocks) const
 {
-	const TArray<FString> Files = PackageUtils::AssetDataToFileNames(InAssetObjectPaths);
-
-	for (const FString& File : Files)
+	for (const FUnityVersionControlLockRef& Lock : InSelectedLocks)
 	{
-		const FString AbsoluteFilename = FPaths::ConvertRelativePathToFull(File);
-		const auto State = FUnityVersionControlModule::Get().GetProvider().GetStateInternal(AbsoluteFilename);
-		// If exclusively Checked Out (Locked) the lock can be released coming back to it's potential underlying "Retained" status if changes where already checked in the branch
-		if (!State->LockedBy.IsEmpty() && State->LockedId != ISourceControlState::INVALID_REVISION)
+		// If "Locked" (currently exclusively Checked Out) the lock can be Released, coming back to it's potential underlying "Retained" status if changes where already checked in the branch
+		if (Lock->bIsLocked)
 		{
 			return true;
 		}
@@ -261,45 +262,34 @@ bool FUnityVersionControlMenu::CanReleaseLocks(TArray<FAssetData> InAssetObjectP
 	return false;
 }
 
-bool FUnityVersionControlMenu::CanRemoveLocks(TArray<FAssetData> InAssetObjectPaths) const
+bool FUnityVersionControlMenu::CanRemoveLocks(TArray<FUnityVersionControlLockRef> InSelectedLocks) const
 {
-	const TArray<FString> Files = PackageUtils::AssetDataToFileNames(InAssetObjectPaths);
-
-	for (const FString& File : Files)
-	{
-		const FString AbsoluteFilename = FPaths::ConvertRelativePathToFull(File);
-		const auto State = FUnityVersionControlModule::Get().GetProvider().GetStateInternal(AbsoluteFilename);
-		// If Locked or Retained, the lock can be removed, that is completely deleted in order to simply ignore the changes from the branch
-		if (State->LockedId != ISourceControlState::INVALID_REVISION)
-		{
-			return true;
-		}
-	}
-
-	return false;
+	// All "Locked" or "Retained" locks can be Removed
+	return (InSelectedLocks.Num() > 0);
 }
 
-void FUnityVersionControlMenu::ExecuteReleaseLocks(TArray<FAssetData> InAssetObjectPaths)
+void FUnityVersionControlMenu::ExecuteReleaseLocks(TArray<FUnityVersionControlLockRef> InSelectedLocks)
 {
-	ExecuteUnlock(InAssetObjectPaths, false);
+	ExecuteUnlock(MoveTemp(InSelectedLocks), false);
 }
 
-void FUnityVersionControlMenu::ExecuteRemoveLocks(TArray<FAssetData> InAssetObjectPaths)
+void FUnityVersionControlMenu::ExecuteRemoveLocks(TArray<FUnityVersionControlLockRef> InSelectedLocks)
 {
-	ExecuteUnlock(InAssetObjectPaths, true);
+	ExecuteUnlock(MoveTemp(InSelectedLocks), true);
 }
 
-void FUnityVersionControlMenu::ExecuteUnlock(const TArray<FAssetData>& InAssetObjectPaths, const bool bInRemove)
+void FUnityVersionControlMenu::ExecuteUnlock(TArray<FUnityVersionControlLockRef>&& InSelectedLocks, const bool bInRemove)
 {
 	if (!Notification.IsInProgress())
 	{
-		const TArray<FString> Files = PackageUtils::AssetDataToFileNames(InAssetObjectPaths);
-
 		// Launch a custom "Release/Remove Lock" operation
 		FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+		const FString& WorkspaceRoot = Provider.GetPathToWorkspaceRoot();
+		const TArray<FString> Files = UnityVersionControlUtils::LocksToFileNames(WorkspaceRoot, InSelectedLocks);
 		TSharedRef<FPlasticUnlock, ESPMode::ThreadSafe> UnlockOperation = ISourceControlOperation::Create<FPlasticUnlock>();
-		const ECommandResult::Type Result = Provider.Execute(UnlockOperation, Files, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlMenu::OnSourceControlOperationComplete));
 		UnlockOperation->bRemove = bInRemove;
+		UnlockOperation->Locks = MoveTemp(InSelectedLocks);
+		const ECommandResult::Type Result = Provider.Execute(UnlockOperation, Files, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FUnityVersionControlMenu::OnSourceControlOperationComplete));
 		if (Result == ECommandResult::Succeeded)
 		{
 			// Display an ongoing notification during the whole operation (packages will be reloaded at the completion of the operation)

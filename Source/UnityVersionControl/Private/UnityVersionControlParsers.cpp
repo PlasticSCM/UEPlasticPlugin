@@ -534,14 +534,14 @@ void ParseFileinfoResults(const TArray<FString>& InResults, TArray<FUnityVersion
 	ensureMsgf(InResults.Num() == InOutStates.Num(), TEXT("The fileinfo command should gives the same number of infos as the status command"));
 
 	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-
 	const FString& BranchName = Provider.GetBranchName();
-	const FString& Repository = Provider.GetRepositoryName();
 
 	TArray<FUnityVersionControlLockRef> Locks;
 	if (Provider.GetPlasticScmVersion() >= UnityVersionControlVersions::SmartLocks)
 	{
-		UnityVersionControlUtils::RunListLocks(Repository, Locks);
+		// In the Content Browser, only show locks applying to the current working branch
+		const bool bForAllDestBranches = false;
+		UnityVersionControlUtils::RunListLocks(Provider, bForAllDestBranches, Locks);
 	}
 
 	// Iterate on all files and all status of the result (assuming same number of line of results than number of file states)

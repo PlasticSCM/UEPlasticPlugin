@@ -48,6 +48,8 @@ private:
 
 	TSharedPtr<SWidget> OnOpenContextMenu();
 
+	FReply OnConfigureLockRulesClicked(const FString InOrganizationName);
+
 	void OnReleaseLocksClicked(TArray<FUnityVersionControlLockRef> InSelectedLocks);
 	void OnRemoveLocksClicked(TArray<FUnityVersionControlLockRef> InSelectedLocks);
 	void ExecuteUnlock(TArray<FUnityVersionControlLockRef>&& InSelectedLocks, const bool bInRemove);

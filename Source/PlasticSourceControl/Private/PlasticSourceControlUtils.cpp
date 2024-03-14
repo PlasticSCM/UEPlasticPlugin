@@ -429,7 +429,7 @@ static bool RunStatus(const FString& InDir, TArray<FString>&& InFiles, const ESt
 		if (Results.Num() > 0)
 		{
 			PlasticSourceControlParsers::GetChangesetFromWorkspaceStatus(Results, OutChangeset);
-			Results.RemoveAt(0, 1, false);
+			Results.RemoveAt(0, EAllowShrinking::No);
 		}
 
 		// Normalize file paths in the result (convert all '\' to '/')

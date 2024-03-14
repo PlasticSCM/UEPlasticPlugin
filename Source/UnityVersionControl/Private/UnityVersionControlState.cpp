@@ -612,6 +612,13 @@ bool FUnityVersionControlState::IsCheckedOut() const
 	}
 }
 
+bool FUnityVersionControlState::IsPendingChanges() const
+{
+	return WorkspaceState != EWorkspaceState::Unknown
+		&& WorkspaceState != EWorkspaceState::Ignored
+		&& WorkspaceState != EWorkspaceState::Controlled;
+}
+
 bool FUnityVersionControlState::IsCheckedOutImplementation() const
 {
 	const bool bIsCheckedOut = WorkspaceState == EWorkspaceState::CheckedOutChanged

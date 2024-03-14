@@ -347,6 +347,22 @@ void SUnityVersionControlSettings::Construct(const FArguments& InArgs)
 				.Font(Font)
 			]
 		]
+		// Option for the View Changes (Changelists) window to also show locally Changed and Private files
+		+SVerticalBox::Slot()
+		.AutoHeight()
+		.Padding(2.0f)
+		.VAlign(VAlign_Center)
+		[
+			SNew(SCheckBox)
+			.ToolTipText(LOCTEXT("ViewLocalChanges_Tooltip", "Enable the \"View Changes\" window to search for and show locally Changed and Private files (can be slow)."))
+			.IsChecked(SUnityVersionControlSettings::IsViewLocalChangesChecked())
+			.OnCheckStateChanged(this, &SUnityVersionControlSettings::OnCheckedViewLocalChanges)
+			[
+				SNew(STextBlock)
+				.Text(LOCTEXT("ViewLocalChanges", "Show local Changes in the \"View Changes\" window."))
+				.Font(Font)
+			]
+		]
 		// Option to enable Source Control Verbose logs
 		+SVerticalBox::Slot()
 		.AutoHeight()
@@ -605,6 +621,19 @@ ECheckBoxState SUnityVersionControlSettings::IsUpdateStatusOtherBranchesChecked(
 {
 	FUnityVersionControlSettings& PlasticSettings = FUnityVersionControlModule::Get().GetProvider().AccessSettings();
 	return PlasticSettings.GetUpdateStatusOtherBranches() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
+}
+
+void SUnityVersionControlSettings::OnCheckedViewLocalChanges(ECheckBoxState NewCheckedState)
+{
+	FUnityVersionControlSettings& PlasticSettings = FUnityVersionControlModule::Get().GetProvider().AccessSettings();
+	PlasticSettings.SetViewLocalChanges(NewCheckedState == ECheckBoxState::Checked);
+	PlasticSettings.SaveSettings();
+}
+
+ECheckBoxState SUnityVersionControlSettings::IsViewLocalChangesChecked() const
+{
+	FUnityVersionControlSettings& PlasticSettings = FUnityVersionControlModule::Get().GetProvider().AccessSettings();
+	return PlasticSettings.GetViewLocalChanges() ? ECheckBoxState::Checked : ECheckBoxState::Unchecked;
 }
 
 void SUnityVersionControlSettings::OnCheckedEnableVerboseLogs(ECheckBoxState NewCheckedState)

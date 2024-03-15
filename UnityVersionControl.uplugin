@@ -19,9 +19,7 @@
 			"Name": "UnityVersionControl",
 			"Type": "UncookedOnly",
 			"LoadingPhase": "EarliestPossible",
-			"PlatformAllowList": [
-				"Win64"
-			]
+			"PlatformAllowList": [ "Win64", "Mac", "Linux" ]
 		}
 	]
 }

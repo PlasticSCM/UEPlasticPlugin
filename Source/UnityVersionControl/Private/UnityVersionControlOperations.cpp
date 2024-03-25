@@ -466,16 +466,17 @@ bool FPlasticCheckInWorker::Execute(FUnityVersionControlCommand& InCommand)
 		{
 			TArray<FString> Parameters;
 			Parameters.Add(FString::Printf(TEXT("--commentsfile=\"%s\""), *CommitMsgFile.GetFilename()));
+			Parameters.Add(TEXT("--all"));			// Also files Changed (not CheckedOut) and Moved/Deleted Locally
+			Parameters.Add(TEXT("--private"));		// Also Private files (not in source control)
+			Parameters.Add(TEXT("--dependencies"));	// Include all the dependent items automatically.
 			if (!GetProvider().IsPartialWorkspace())
 			{
-				Parameters.Add(TEXT("--all")); // Also files Changed (not CheckedOut) and Moved/Deleted Locally
-			//  NOTE: --update added as #23 but removed as #32 because most assets are locked by the Unreal Editor
+				//  NOTE: --update added as #23 but removed as #32 because most assets are locked by the Unreal Editor
 			//  Parameters.Add(TEXT("--update")); // Processes the update-merge automatically if it eventually happens.
 				InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("checkin"), Parameters, Files, InCommand.InfoMessages, InCommand.ErrorMessages);
 			}
 			else
 			{
-				Parameters.Add(TEXT("--applychanged")); // Also files Changed (not CheckedOut) and Moved/Deleted Locally
 				InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("partial checkin"), Parameters, Files, InCommand.InfoMessages, InCommand.ErrorMessages);
 			}
 			if (InCommand.bCommandSuccessful)
@@ -1440,6 +1441,18 @@ bool FPlasticUpdateStatusWorker::UpdateStates()
 				PreviousChangelist->Files.Remove(State);
 				// 2- And reset the reference to their previous changelist
 				State->Changelist.Reset();
+			}
+		}
+		else if (NewState.WorkspaceState == EWorkspaceState::Changed)
+		{
+			TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe> State = GetProvider().GetStateInternal(NewState.GetFilename());
+			if (State->WorkspaceState != EWorkspaceState::Changed)
+			{
+				// 1- Add these files to the default changelist
+				TSharedRef<FUnityVersionControlChangelistState, ESPMode::ThreadSafe> DefaultChangelist = GetProvider().GetStateInternal(FUnityVersionControlChangelist::DefaultChangelist);
+				DefaultChangelist->Files.AddUnique(State);
+				// 2- And set the reference to the default changelist
+				State->Changelist = FUnityVersionControlChangelist::DefaultChangelist;
 			}
 		}
 	}

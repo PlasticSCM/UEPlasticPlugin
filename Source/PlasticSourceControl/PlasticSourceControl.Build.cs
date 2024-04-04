@@ -29,6 +29,7 @@ public class PlasticSourceControl : ModuleRules
 				"DeveloperSettings",
 				"ToolMenus",
 				"ContentBrowser",
+				"SourceControlWindows",
 			}
 		);
 

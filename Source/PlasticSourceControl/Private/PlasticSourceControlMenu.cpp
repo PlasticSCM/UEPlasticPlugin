@@ -13,6 +13,8 @@
 
 #include "ISourceControlModule.h"
 #include "ISourceControlOperation.h"
+#include "SourceControlHelpers.h"
+#include "SourceControlMenuContext.h"
 #include "SourceControlOperations.h"
 
 #include "ContentBrowserMenuContexts.h"
@@ -32,6 +34,8 @@
 
 #include "Logging/MessageLog.h"
 
+#include "Editor.h"
+#include "Selection.h"
 #include "ToolMenus.h"
 #include "ToolMenuMisc.h"
 
@@ -53,6 +57,8 @@ void FPlasticSourceControlMenu::Register()
 	ExtendAssetContextMenu();
 
 	ExtendToolbarWithStatusBarWidget();
+
+	ExtendChangelistContextMenu();
 }
 
 void FPlasticSourceControlMenu::Unregister()
@@ -187,6 +193,157 @@ void FPlasticSourceControlMenu::ExtendAssetContextMenu()
 	}
 }
 
+TArray<FAssetData> GetAssetsFromFilenames(const TArray<FString>& Filenames)
+{
+	TArray<FAssetData> Assets;
+
+	for (const FString& Filename : Filenames)
+	{
+		TArray<FAssetData> OutAssets;
+		if (SourceControlHelpers::GetAssetData(Filename, OutAssets))
+		{
+			Assets.Append(OutAssets);
+		}
+	}
+
+	return Assets;
+}
+
+void FPlasticSourceControlMenu::ExtendChangelistContextMenu()
+{
+	// TODO From FSourceControlWindowExtenderModule::ExtendMenu()
+
+	UToolMenu* Menu = UToolMenus::Get()->ExtendMenu("SourceControl.ChangelistContextMenu");
+	FToolMenuSection& Section = Menu->AddDynamicSection("PlasticExtenderSection", FNewToolMenuDelegate::CreateLambda([this](UToolMenu* InMenu)
+	{
+		if (USourceControlMenuContext* MenuContext = InMenu->FindContext<USourceControlMenuContext>())
+        {
+			const TArray<FString>& SelectedFiles = MenuContext->SelectedFiles;
+			const TArray<FAssetData> SelectedAssets = GetAssetsFromFilenames(SelectedFiles);
+
+			auto FindOrAddExtendSection = [InMenu]() -> FToolMenuSection*
+			{
+				FToolMenuSection* ExtendSection = InMenu->FindSection("PlasticExtender");
+				if (!ExtendSection)
+				{
+					ExtendSection = &InMenu->AddSection("PlasticExtender", TAttribute<FText>(), FToolMenuInsert("Source Control", EToolMenuInsertType::After));
+					ExtendSection->AddSeparator(NAME_None);
+				}
+				return ExtendSection;
+			};
+
+			if (SelectedFiles.Num() > 0)
+			{
+				// Add a menu entry to Add to source control private files or Checkout locally changed files
+				FindOrAddExtendSection()->AddMenuEntry(
+#if ENGINE_MAJOR_VERSION == 5
+					TEXT("PlasticAddFiles"),
+#endif
+					LOCTEXT("PlasticAddFiles", "Add"),
+					LOCTEXT("PlasticAddFileTooltip", "Add selected files."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+					FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Add"),
+#else
+					FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Add"),
+#endif
+					FUIAction(
+						FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ExecuteAddFiles, SelectedFiles)
+					)
+				);
+				FindOrAddExtendSection()->AddMenuEntry(
+#if ENGINE_MAJOR_VERSION == 5
+					TEXT("PlasticCheckOutFiles"),
+#endif
+					LOCTEXT("PlasticCheckOutFiles", "Checkout"),
+					LOCTEXT("PlasticCheckOutFileTooltip", "Checkout selected files."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+					FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Edit"),
+#else
+					FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Edit"),
+#endif
+					FUIAction(
+						FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::ExecuteCheckOutFiles, SelectedFiles)
+					)
+				);
+			}
+
+            if (SelectedAssets.Num() > 0)
+            {
+				FindOrAddExtendSection()->AddSubMenu(TEXT("Assets"),
+                    LOCTEXT("AssetSubMenu", "Assets"),
+                    LOCTEXT("AssetSubMenuTooltip", ""),
+                    FNewToolMenuChoice(FNewMenuDelegate::CreateLambda([this, SelectedAssets](FMenuBuilder& MenuBuilder)
+                    {
+                        MenuBuilder.BeginSection(NAME_None);
+                        MenuBuilder.AddMenuEntry(LOCTEXT("BrowseToAssets", "Browse to Asset"), LOCTEXT("BrowseToAssets_Tooltip", "Browse to Asset in Content Browser"),
+							FSlateIcon(FAppStyle::GetAppStyleSetName(), "SystemWideCommands.FindInContentBrowser.Small"),
+							FUIAction(FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::BrowseToAssets, SelectedAssets)));
+                        MenuBuilder.EndSection();
+                    })));
+            }
+        }
+    }));
+}
+
+void FPlasticSourceControlMenu::BrowseToAssets(const TArray<FAssetData> InSelectedAssets)
+{
+	GEditor->SyncBrowserToObjects(const_cast<TArray<FAssetData>&>(InSelectedAssets));
+}
+
+void FPlasticSourceControlMenu::ExecuteAddFiles(const TArray<FString> InSelectedFiles)
+{
+	if (!Notification.IsInProgress())
+	{
+		// Launch a standard "MarkForAdd" operation
+		FPlasticSourceControlProvider& Provider = FPlasticSourceControlModule::Get().GetProvider();
+		TSharedRef<FMarkForAdd, ESPMode::ThreadSafe> MarkForAddOperation = ISourceControlOperation::Create<FMarkForAdd>();
+		const ECommandResult::Type Result = Provider.Execute(MarkForAddOperation, InSelectedFiles, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FPlasticSourceControlMenu::OnSourceControlOperationComplete));
+		if (Result == ECommandResult::Succeeded)
+		{
+			// Display an ongoing notification during the whole operation
+			Notification.DisplayInProgress(MarkForAddOperation->GetInProgressString());
+		}
+		else
+		{
+			// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
+			FNotification::DisplayFailure(MarkForAddOperation.Get());
+		}
+	}
+	else
+	{
+		FMessageLog SourceControlLog("SourceControl");
+		SourceControlLog.Warning(LOCTEXT("SourceControlMenu_InProgress", "Source control operation already in progress"));
+		SourceControlLog.Notify();
+	}
+}
+
+void FPlasticSourceControlMenu::ExecuteCheckOutFiles(const TArray<FString> InSelectedFiles)
+{
+	if (!Notification.IsInProgress())
+	{
+		// Launch a standard "CheckOut" operation
+		FPlasticSourceControlProvider& Provider = FPlasticSourceControlModule::Get().GetProvider();
+		TSharedRef<FCheckOut, ESPMode::ThreadSafe> CheckoutOperation = ISourceControlOperation::Create<FCheckOut>();
+		const ECommandResult::Type Result = Provider.Execute(CheckoutOperation, InSelectedFiles, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FPlasticSourceControlMenu::OnSourceControlOperationComplete));
+		if (Result == ECommandResult::Succeeded)
+		{
+			// Display an ongoing notification during the whole operation
+			Notification.DisplayInProgress(CheckoutOperation->GetInProgressString());
+		}
+		else
+		{
+			// Report failure with a notification (but nothing need to be reloaded since no local change is expected)
+			FNotification::DisplayFailure(CheckoutOperation.Get());
+		}
+	}
+	else
+	{
+		FMessageLog SourceControlLog("SourceControl");
+		SourceControlLog.Warning(LOCTEXT("SourceControlMenu_InProgress", "Source control operation already in progress"));
+		SourceControlLog.Notify();
+	}
+}
+
 void FPlasticSourceControlMenu::GeneratePlasticAssetContextMenu(FMenuBuilder& MenuBuilder, TArray<FAssetData> InAssetObjectPaths)
 {
 	const FPlasticSourceControlProvider& Provider = FPlasticSourceControlModule::Get().GetProvider();
@@ -292,7 +449,7 @@ void FPlasticSourceControlMenu::ExecuteUnlock(TArray<FPlasticSourceControlLockRe
 		const ECommandResult::Type Result = Provider.Execute(UnlockOperation, Files, EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateRaw(this, &FPlasticSourceControlMenu::OnSourceControlOperationComplete));
 		if (Result == ECommandResult::Succeeded)
 		{
-			// Display an ongoing notification during the whole operation (packages will be reloaded at the completion of the operation)
+			// Display an ongoing notification during the whole operation
 			Notification.DisplayInProgress(UnlockOperation->GetInProgressString());
 		}
 		else

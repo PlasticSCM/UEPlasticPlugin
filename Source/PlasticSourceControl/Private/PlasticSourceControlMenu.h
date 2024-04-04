@@ -58,6 +58,12 @@ private:
 	void ExtendRevisionControlMenu();
 	/** Extends the content browser asset context menu with Admin revision control options. */
 	void ExtendAssetContextMenu();
+	// TODO POC
+	void ExtendChangelistContextMenu();
+	void BrowseToAssets(const TArray<FAssetData> InSelectedAssets);
+	void ExecuteAddFiles(const TArray<FString> InSelectedFiles);
+	void ExecuteCheckOutFiles(const TArray<FString> InSelectedFiles);
+
 	/** Called to generate concert asset context menu. */
 	void GeneratePlasticAssetContextMenu(FMenuBuilder& MenuBuilder, TArray<FAssetData> InAssetObjectPaths);
 

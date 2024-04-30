@@ -72,7 +72,7 @@ FText ParseCheckInResults(const TArray<FString>& InResults);
 
 #if ENGINE_MAJOR_VERSION == 5
 
-bool ParseChangelistsResults(const FString& Results, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates);
+bool ParseChangelistsResults(const FString& InResultFilename, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates);
 
 bool ParseShelveDiffResult(const FString InWorkspaceRoot, TArray<FString>&& InResults, FUnityVersionControlChangelistState& InOutChangelistsState);
 bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InResults, TArray<FUnityVersionControlRevision>& OutBaseRevisions);

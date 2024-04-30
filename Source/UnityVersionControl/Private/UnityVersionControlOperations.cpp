@@ -442,66 +442,86 @@ bool FPlasticCheckInWorker::Execute(FUnityVersionControlCommand& InCommand)
 
 	const TArray<FString> Files = GetFilesFromCommand(GetProvider(), InCommand);
 
-	if (Files.Num() > 0)
-	{
-#if ENGINE_MAJOR_VERSION == 5
-		if (InCommand.Changelist.IsInitialized())
-		{
-			TSharedRef<FUnityVersionControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(InCommand.Changelist);
-
-			if (Description.IsEmpty())
-			{
-				Description = ChangelistState->GetDescriptionText();
-			}
-
-			InChangelist = InCommand.Changelist;
-		}
-#endif
-
-		UE_LOG(LogSourceControl, Verbose, TEXT("CheckIn: %d file(s) Description: '%s'"), Files.Num(), *Description.ToString());
-
-		// make a temp file to place our commit message in
-		const FScopedTempFile CommitMsgFile(Description);
-		if (!CommitMsgFile.GetFilename().IsEmpty())
-		{
-			TArray<FString> Parameters;
-			Parameters.Add(FString::Printf(TEXT("--commentsfile=\"%s\""), *CommitMsgFile.GetFilename()));
-			Parameters.Add(TEXT("--all"));			// Also files Changed (not CheckedOut) and Moved/Deleted Locally
-			Parameters.Add(TEXT("--private"));		// Also Private files (not in source control)
-			Parameters.Add(TEXT("--dependencies"));	// Include all the dependent items automatically.
-			if (!GetProvider().IsPartialWorkspace())
-			{
-				//  NOTE: --update added as #23 but removed as #32 because most assets are locked by the Unreal Editor
-			//  Parameters.Add(TEXT("--update")); // Processes the update-merge automatically if it eventually happens.
-				InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("checkin"), Parameters, Files, InCommand.InfoMessages, InCommand.ErrorMessages);
-			}
-			else
-			{
-				InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("partial checkin"), Parameters, Files, InCommand.InfoMessages, InCommand.ErrorMessages);
-			}
-			if (InCommand.bCommandSuccessful)
-			{
-				Operation->SetSuccessMessage(UnityVersionControlParsers::ParseCheckInResults(InCommand.InfoMessages));
-				UE_LOG(LogSourceControl, Log, TEXT("CheckIn successful"));
-			}
-
-#if ENGINE_MAJOR_VERSION == 5
-			if (InChangelist.IsInitialized() && !InChangelist.IsDefault())
-			{
-				// NOTE: we need to explicitly delete persistent changelists when we submit its content, except for the Default changelist
-				DeleteChangelist(GetProvider(), InChangelist, InCommand.InfoMessages, InCommand.ErrorMessages);
-			}
-#endif
-		}
-
-		// now update the status of our files
-		UnityVersionControlUtils::InvalidateLocksCache();
-		UnityVersionControlUtils::RunUpdateStatus(Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
-	}
-	else
+	if (Files.Num() == 0)
 	{
 		UE_LOG(LogSourceControl, Warning, TEXT("Checkin: No files provided"));
+		return false;
 	}
+
+	// Add Private files to source control to be able to check them in
+	TArray<FString> FilesToAdd;
+	for (const FString& File : Files)
+	{
+		TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe> State = GetProvider().GetStateInternal(File);
+		if (!State->IsSourceControlled())
+		{
+			FilesToAdd.Add(File);
+		}
+	}
+	if (FilesToAdd.Num() > 0)
+	{
+		UE_LOG(LogSourceControl, Log, TEXT("CheckIn: Adding %d file(s) to source control"), FilesToAdd.Num());
+		if (!GetProvider().IsPartialWorkspace())
+		{
+			InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("add"), TArray<FString>(), FilesToAdd, InCommand.InfoMessages, InCommand.ErrorMessages);
+		}
+		else
+		{
+			InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("partial add"), TArray<FString>(), FilesToAdd, InCommand.InfoMessages, InCommand.ErrorMessages);
+		}
+	}
+
+#if ENGINE_MAJOR_VERSION == 5
+	if (InCommand.Changelist.IsInitialized())
+	{
+		TSharedRef<FUnityVersionControlChangelistState, ESPMode::ThreadSafe> ChangelistState = GetProvider().GetStateInternal(InCommand.Changelist);
+
+		if (Description.IsEmpty())
+		{
+			Description = ChangelistState->GetDescriptionText();
+		}
+
+		InChangelist = InCommand.Changelist;
+	}
+#endif
+
+	UE_LOG(LogSourceControl, Verbose, TEXT("CheckIn: %d file(s) Description: '%s'"), Files.Num(), *Description.ToString());
+
+	// make a temp file to place our commit message in
+	const FScopedTempFile CommitMsgFile(Description);
+	if (!CommitMsgFile.GetFilename().IsEmpty())
+	{
+		TArray<FString> Parameters;
+		Parameters.Add(FString::Printf(TEXT("--commentsfile=\"%s\""), *CommitMsgFile.GetFilename()));
+		Parameters.Add(TEXT("--all"));			// Also files Changed (not CheckedOut) and Moved/Deleted Locally
+		if (!GetProvider().IsPartialWorkspace())
+		{
+			//  NOTE: --update added as #23 but removed as #32 because most assets are locked by the Unreal Editor
+		//  Parameters.Add(TEXT("--update")); // Processes the update-merge automatically if it eventually happens.
+			InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("checkin"), Parameters, Files, InCommand.InfoMessages, InCommand.ErrorMessages);
+		}
+		else
+		{
+			InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("partial checkin"), Parameters, Files, InCommand.InfoMessages, InCommand.ErrorMessages);
+		}
+		if (InCommand.bCommandSuccessful)
+		{
+			Operation->SetSuccessMessage(UnityVersionControlParsers::ParseCheckInResults(InCommand.InfoMessages));
+			UE_LOG(LogSourceControl, Log, TEXT("CheckIn successful"));
+		}
+
+#if ENGINE_MAJOR_VERSION == 5
+		if (InChangelist.IsInitialized() && !InChangelist.IsDefault())
+		{
+			// NOTE: we need to explicitly delete persistent changelists when we submit its content, except for the Default changelist
+			DeleteChangelist(GetProvider(), InChangelist, InCommand.InfoMessages, InCommand.ErrorMessages);
+		}
+#endif
+	}
+
+	// now update the status of our files
+	UnityVersionControlUtils::InvalidateLocksCache();
+	UnityVersionControlUtils::RunUpdateStatus(Files, UnityVersionControlUtils::EStatusSearchType::ControlledOnly, false, InCommand.ErrorMessages, States, InCommand.ChangesetNumber, InCommand.BranchName);
 
 	return InCommand.bCommandSuccessful;
 }
@@ -1208,7 +1228,7 @@ bool FPlasticSwitchToBranchWorker::Execute(FUnityVersionControlCommand& InComman
 	check(InCommand.Operation->GetName() == GetName());
 	TSharedRef<FPlasticSwitchToBranch, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticSwitchToBranch>(InCommand.Operation);
 
-	InCommand.bCommandSuccessful = UnityVersionControlUtils::RunSwitchToBranch(Operation->BranchName, Operation->UpdatedFiles, InCommand.ErrorMessages);
+	InCommand.bCommandSuccessful = UnityVersionControlUtils::RunSwitchToBranch(Operation->BranchName, GetProvider().IsPartialWorkspace(), Operation->UpdatedFiles, InCommand.ErrorMessages);
 
 	// now update the status of the updated files
 	if (InCommand.bCommandSuccessful && Operation->UpdatedFiles.Num())
@@ -1754,6 +1774,11 @@ bool FPlasticGetPendingChangelistsWorker::UpdateStates()
 			for (const auto& FileState : OutCLFilesStates[StatusIndex])
 			{
 				TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe> CachedFileState = GetProvider().GetStateInternal(FileState.LocalFilename);
+				if (CachedFileState->WorkspaceState == EWorkspaceState::Unknown)
+				{
+					CachedFileState->WorkspaceState = FileState.WorkspaceState;
+					CachedFileState->TimeStamp = Now;
+				}
 				CachedFileState->Changelist = CLStatus.Changelist;
 				ChangelistState->Files.AddUnique(CachedFileState);
 			}

@@ -458,7 +458,8 @@ FUnityVersionControlLock ParseLockInfo(const FString& InResult)
 		Lock.Branch = MoveTemp(SmartLockInfos[6]);
 		Lock.Status = MoveTemp(SmartLockInfos[8]);
 		Lock.bIsLocked = (Lock.Status == TEXT("Locked"));
-		Lock.Owner = UnityVersionControlUtils::UserNameToDisplayName(MoveTemp(SmartLockInfos[9]));
+		// Note: keeping the full email address as the owner name so we can display both the short and full name in the tooltip
+		Lock.Owner = MoveTemp(SmartLockInfos[9]);
 		Lock.Workspace = MoveTemp(SmartLockInfos[10]);
 		Lock.Path = MoveTemp(SmartLockInfos[11]);
 	}
@@ -564,13 +565,13 @@ void ParseFileinfoResults(const TArray<FString>& InResults, TArray<FUnityVersion
 			// "Locked" vs "Retained" lock
 			if (Lock->bIsLocked)
 			{
-				ConcatStrings(FileState.LockedBy, TEXT(", "), Lock->Owner);
+				ConcatStrings(FileState.LockedBy, TEXT(", "), UnityVersionControlUtils::UserNameToDisplayName(Lock->Owner));
 			}
 			// Considers a "Retained" lock as meaningful only if it is retained on another branch
 			// NOTE: this is required to avoid the Unreal Editor showing a popup warning preventing the user to save the asset
 			else if (Lock->Branch != BranchName)
 			{
-				ConcatStrings(FileState.RetainedBy, TEXT(", "), Lock->Owner);
+				ConcatStrings(FileState.RetainedBy, TEXT(", "), UnityVersionControlUtils::UserNameToDisplayName(Lock->Owner));
 			}
 			ConcatStrings(FileState.LockedWhere, TEXT(", "), Lock->Workspace);
 			ConcatStrings(FileState.LockedBranch, TEXT(", "), Lock->Branch);
@@ -1137,7 +1138,9 @@ static bool ParseChangelistsResults(const FXmlFile& InXmlResult, TArray<FUnityVe
 	static const FString Type(TEXT("Type"));
 	static const FString Path(TEXT("Path"));
 
-	const FString& WorkspaceRoot = FUnityVersionControlModule::Get().GetProvider().GetPathToWorkspaceRoot();
+	FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+	const FString& WorkspaceRoot = Provider.GetPathToWorkspaceRoot();
+	const bool bUsesCheckedOutChanged = Provider.GetPlasticScmVersion() >= UnityVersionControlVersions::StatusIsCheckedOutChanged;
 
 	const FXmlNode* StatusOutputNode = InXmlResult.GetRootNode();
 	if (StatusOutputNode == nullptr || StatusOutputNode->GetTag() != StatusOutput)
@@ -1184,6 +1187,10 @@ static bool ParseChangelistsResults(const FXmlFile& InXmlResult, TArray<FUnityVe
 				{
 					FUnityVersionControlState FileState(FPaths::ConvertRelativePathToFull(WorkspaceRoot, MoveTemp(FileName)));
 					FileState.Changelist = ChangelistState.Changelist;
+					if (const FXmlNode* TypeNode = ChangeNode->FindChildNode(Type))
+					{
+						FileState.WorkspaceState = StateFromStatus(TypeNode->GetContent(), bUsesCheckedOutChanged);
+					}
 					OutCLFilesStates[ChangelistIndex].Add(MoveTemp(FileState));
 				}
 			}
@@ -1205,14 +1212,14 @@ static bool ParseChangelistsResults(const FXmlFile& InXmlResult, TArray<FUnityVe
 	return true;
 }
 
-bool ParseChangelistsResults(const FString& Results, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates)
+bool ParseChangelistsResults(const FString& InResultFilename, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates)
 {
 	bool bResult = false;
 
 	FXmlFile XmlFile;
 	{
 		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseChangelistsResults::FXmlFile::LoadFile);
-		bResult = XmlFile.LoadFile(Results, EConstructMethod::ConstructFromBuffer);
+		bResult = XmlFile.LoadFile(InResultFilename);
 	}
 	if (bResult)
 	{

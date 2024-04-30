@@ -300,29 +300,25 @@ static bool RunStatus(const FString& InDir, TArray<FString>&& InFiles, const ESt
 	TArray<FString> Parameters;
 	Parameters.Add(TEXT("--machinereadable"));
 	Parameters.Add(TEXT("--fieldseparator=\"") FILE_STATUS_SEPARATOR TEXT("\""));
+	Parameters.Add(TEXT("--controlledchanged"));
 	if (InSearchType == EStatusSearchType::All)
 	{
 		// NOTE: don't use "--all" to avoid searching for --localmoved since it's the most time consuming (beside --changed)
 		// and its not used by the plugin (matching similarities doesn't seem to work with .uasset files)
-		Parameters.Add(TEXT("--controlledchanged"));
 		// TODO: add a user settings to avoid searching for --changed and --localdeleted, to work like Perforce on big projects,
 		// provided that the user understands the consequences (they won't see assets modified locally without a proper checkout)
 		Parameters.Add(TEXT("--changed"));
 		Parameters.Add(TEXT("--localdeleted"));
 		Parameters.Add(TEXT("--private"));
 		Parameters.Add(TEXT("--ignored"));
-
-		// If the version of cm is recent enough use the new --iscochanged for "CO+CH" status
-		const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-		const bool bUsesCheckedOutChanged = Provider.GetPlasticScmVersion() >= UnityVersionControlVersions::StatusIsCheckedOutChanged;
-		if (bUsesCheckedOutChanged)
-		{
-			Parameters.Add(TEXT("--iscochanged"));
-		}
 	}
-	else if (InSearchType == EStatusSearchType::ControlledOnly)
+
+	// If the version of cm is recent enough use the new --iscochanged for "CO+CH" status
+	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+	const bool bUsesCheckedOutChanged = Provider.GetPlasticScmVersion() >= UnityVersionControlVersions::StatusIsCheckedOutChanged;
+	if (bUsesCheckedOutChanged)
 	{
-		Parameters.Add(TEXT("--controlledchanged"));
+		Parameters.Add(TEXT("--iscochanged"));
 	}
 
 	// "cm status" only operate on one path (file or directory) at a time, so use one common path for multiple files in a directory
@@ -765,7 +761,7 @@ bool RunUpdateStatus(const TArray<FString>& InFiles, const EStatusSearchType InS
 		// This should be an edge case (typically the uproject file) .
 		if (!bDirFound)
 		{
-			FString Path = FPaths::GetPath(File) + TEXT('/');
+			const FString Path = FPaths::GetPath(File) + TEXT('/');
 			FFilesInCommonDir* ExistingGroup = GroupOfFiles.Find(Path);
 			if (ExistingGroup != nullptr)
 			{
@@ -773,7 +769,7 @@ bool RunUpdateStatus(const TArray<FString>& InFiles, const EStatusSearchType InS
 			}
 			else
 			{
-				GroupOfFiles.Add(Path, { MoveTemp(Path), {File} });
+				GroupOfFiles.Add(Path, { Path, {File} });
 			}
 		}
 	}
@@ -908,10 +904,11 @@ bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace,
 	{
 		const FScopedTempFile UpdateResultFile;
 		TArray<FString> InfoMessages;
-		Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *UpdateResultFile.GetFilename()));
-		Parameters.Add(TEXT("--encoding=\"utf-8\""));
 		Parameters.Add(TEXT("--last"));
 		Parameters.Add(TEXT("--dontmerge"));
+		Parameters.Add(TEXT("--noinput"));
+		Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *UpdateResultFile.GetFilename()));
+		Parameters.Add(TEXT("--encoding=\"utf-8\""));
 		bResult = UnityVersionControlUtils::RunCommand(TEXT("update"), Parameters, TArray<FString>(), InfoMessages, OutErrorMessages);
 		if (bResult)
 		{
@@ -945,12 +942,15 @@ bool RunGetChangelists(TArray<FUnityVersionControlChangelistState>& OutChangelis
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlUtils::RunGetChangelists);
 
+	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+
 	FString Results;
 	FString Errors;
+	const FScopedTempFile GetChangelistFile;
 	TArray<FString> Parameters;
 	Parameters.Add(TEXT("--changelists"));
 	Parameters.Add(TEXT("--controlledchanged"));
-	if (FUnityVersionControlModule::Get().GetProvider().AccessSettings().GetViewLocalChanges())
+	if (Provider.AccessSettings().GetViewLocalChanges())
 	{
 		// NOTE: don't use "--all" to avoid searching for --localmoved since it's the most time consuming (beside --changed)
 		// and its not used by the plugin (matching similarities doesn't seem to work with .uasset files)
@@ -958,13 +958,21 @@ bool RunGetChangelists(TArray<FUnityVersionControlChangelistState>& OutChangelis
 		Parameters.Add(TEXT("--localdeleted"));
 		Parameters.Add(TEXT("--private"));
 	}
+
+	// If the version of cm is recent enough use the new --iscochanged for "CO+CH" status
+	const bool bUsesCheckedOutChanged = Provider.GetPlasticScmVersion() >= UnityVersionControlVersions::StatusIsCheckedOutChanged;
+	if (bUsesCheckedOutChanged)
+	{
+		Parameters.Add(TEXT("--iscochanged"));
+	}
+
 	Parameters.Add(TEXT("--noheader"));
-	Parameters.Add(TEXT("--xml"));
+	Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *GetChangelistFile.GetFilename()));
 	Parameters.Add(TEXT("--encoding=\"utf-8\""));
 	bool bResult = RunCommand(TEXT("status"), Parameters, TArray<FString>(), Results, Errors);
 	if (bResult)
 	{
-		bResult = UnityVersionControlParsers::ParseChangelistsResults(Results, OutChangelistsStates, OutCLFilesStates);
+		bResult = UnityVersionControlParsers::ParseChangelistsResults(GetChangelistFile.GetFilename(), OutChangelistsStates, OutCLFilesStates);
 	}
 	if (!Errors.IsEmpty())
 	{
@@ -1156,22 +1164,37 @@ bool RunGetBranches(const FDateTime& InFromDate, TArray<FUnityVersionControlBran
 	return bCommandSuccessful;
 }
 
-bool RunSwitchToBranch(const FString& InBranchName, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages)
+bool RunSwitchToBranch(const FString& InBranchName, const bool bInIsPartialWorkspace, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages)
 {
 	bool bResult = false;
 
 	const FScopedTempFile SwitchResultFile;
 	TArray<FString> InfoMessages;
 	TArray<FString> Parameters;
-	Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *SwitchResultFile.GetFilename()));
-	Parameters.Add(TEXT("--encoding=\"utf-8\""));
 	Parameters.Add(FString::Printf(TEXT("\"br:%s\""), *InBranchName));
-	bResult = UnityVersionControlUtils::RunCommand(TEXT("switch"), Parameters, TArray<FString>(), InfoMessages, OutErrorMessages);
-	if (bResult)
+	Parameters.Add(TEXT("--noinput"));
+	// Detect special case for a partial checkout (CS:-1 in Gluon mode)!
+	if (!bInIsPartialWorkspace)
 	{
-		// Load and parse the result of the update command
-		FString Results;
-		if (FFileHelper::LoadFileToString(Results, *SwitchResultFile.GetFilename()))
+		Parameters.Add(FString::Printf(TEXT("--xml=\"%s\""), *SwitchResultFile.GetFilename()));
+		Parameters.Add(TEXT("--encoding=\"utf-8\""));
+		bResult = UnityVersionControlUtils::RunCommand(TEXT("switch"), Parameters, TArray<FString>(), InfoMessages, OutErrorMessages);
+		if (bResult)
+		{
+			// Load and parse the result of the update command
+			FString Results;
+			if (FFileHelper::LoadFileToString(Results, *SwitchResultFile.GetFilename()))
+			{
+				bResult = UnityVersionControlParsers::ParseUpdateResults(Results, OutUpdatedFiles);
+			}
+		}
+	}
+	else
+	{
+		TArray<FString> Results;
+		Parameters.Add(TEXT("--report"));
+		bResult = UnityVersionControlUtils::RunCommand(TEXT("partial switch"), Parameters, TArray<FString>(), Results, OutErrorMessages);
+		if (bResult)
 		{
 			bResult = UnityVersionControlParsers::ParseUpdateResults(Results, OutUpdatedFiles);
 		}

@@ -2,14 +2,14 @@
 
 #include "PlasticSourceControlStyle.h"
 
+#include "PlasticSourceControlModule.h"
+
 #include "Framework/Application/SlateApplication.h"
 #include "Interfaces/IPluginManager.h"
 #include "Slate/SlateGameResources.h"
 #include "Styling/SlateStyle.h"
 #include "Styling/SlateStyleMacros.h"
 #include "Styling/SlateStyleRegistry.h"
-
-#include "PlasticSourceControlModule.h"
 
 TSharedPtr<FSlateStyleSet> FPlasticSourceControlStyle::StyleInstance = nullptr;
 

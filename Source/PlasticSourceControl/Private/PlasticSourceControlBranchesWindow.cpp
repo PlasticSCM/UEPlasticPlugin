@@ -2,11 +2,11 @@
 
 #include "PlasticSourceControlBranchesWindow.h"
 
-#include "Framework/Docking/TabManager.h"
-#include "Widgets/Docking/SDockTab.h"
-
-#include "PlasticSourceControlStyle.h"
 #include "SPlasticSourceControlBranchesWidget.h"
+
+#include "Framework/Docking/TabManager.h"
+#include "RevisionControlStyle/RevisionControlStyle.h"
+#include "Widgets/Docking/SDockTab.h"
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControlBranchesWindow"
 
@@ -14,20 +14,15 @@ static const FName PlasticSourceControlBranchesWindowTabName("PlasticSourceContr
 
 void FPlasticSourceControlBranchesWindow::Register()
 {
-	FPlasticSourceControlStyle::Initialize();
-	FPlasticSourceControlStyle::ReloadTextures();
-
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(PlasticSourceControlBranchesWindowTabName, FOnSpawnTab::CreateRaw(this, &FPlasticSourceControlBranchesWindow::OnSpawnTab))
 		.SetDisplayName(LOCTEXT("PlasticSourceControlBranchesWindowTabTitle", "View Branches"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden)
-		.SetIcon(FSlateIcon(FPlasticSourceControlStyle::Get().GetStyleSetName(), "PlasticSourceControl.PluginIcon.Small"));
+		.SetIcon(FSlateIcon(FRevisionControlStyleManager::GetStyleSetName(), "RevisionControl.Branched"));
 }
 
 void FPlasticSourceControlBranchesWindow::Unregister()
 {
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(PlasticSourceControlBranchesWindowTabName);
-
-	FPlasticSourceControlStyle::Shutdown();
 }
 
 TSharedRef<SDockTab> FPlasticSourceControlBranchesWindow::OnSpawnTab(const FSpawnTabArgs& SpawnTabArgs)

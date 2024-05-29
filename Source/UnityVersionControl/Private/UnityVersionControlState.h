@@ -75,7 +75,10 @@ public:
 
 	void Move(FUnityVersionControlState&& InState)
 	{
-		History = MoveTemp(InState.History);
+		if (InState.History.Num() > 0)
+		{
+			History = MoveTemp(InState.History);
+		}
 		LocalFilename = MoveTemp(InState.LocalFilename);
 		WorkspaceState = InState.WorkspaceState;
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
@@ -118,6 +121,13 @@ public:
 
 	// debug log utility
 	const TCHAR* ToString() const;
+
+	FText ToText() const;
+
+	void PopulateSearchString(TArray<FString>& OutStrings) const
+	{
+		OutStrings.Emplace(LocalFilename);
+	}
 
 	/** ISourceControlState interface */
 	virtual int32 GetHistorySize() const override;
@@ -251,3 +261,6 @@ public:
 	/** The change list of the last modification */
 	int32 HeadChangeList;
 };
+
+typedef TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe> FUnityVersionControlStateRef;
+typedef TSharedPtr<FUnityVersionControlState, ESPMode::ThreadSafe> FUnityVersionControlStatePtr;

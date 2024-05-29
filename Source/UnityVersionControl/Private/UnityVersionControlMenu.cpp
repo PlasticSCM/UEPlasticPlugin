@@ -127,6 +127,7 @@ void FUnityVersionControlMenu::ExtendRevisionControlMenu()
 		if (FToolMenuSection* Section = ToolsMenu->FindSection("Source Control"))
 		{
 			AddViewBranches(*Section);
+			AddViewChangesets(*Section);
 			AddViewLocks(*Section);
 		}
 	}
@@ -519,24 +520,19 @@ void FUnityVersionControlMenu::VisitLockRulesURLClicked(const FString InOrganiza
 	UnityVersionControlUtils::OpenLockRulesInCloudDashboard(InOrganizationName);
 }
 
-void FUnityVersionControlMenu::OpenDeskoptApp() const
+void FUnityVersionControlMenu::OpenDesktopApplication() const
 {
-	const FString DesktopAppPath = UnityVersionControlUtils::FindDesktopApplicationPath();
-	const FString CommandLineArguments = FString::Printf(TEXT("--wk=\"%s\""), *FUnityVersionControlModule::Get().GetProvider().GetPathToWorkspaceRoot());
-
-	UE_LOG(LogSourceControl, Log, TEXT("Opening the Desktop application (%s %s)"), *DesktopAppPath, *CommandLineArguments);
-
-	FProcHandle Proc = FPlatformProcess::CreateProc(*DesktopAppPath, *CommandLineArguments, true, false, false, nullptr, 0, nullptr, nullptr, nullptr);
-	if (!Proc.IsValid())
-	{
-		UE_LOG(LogSourceControl, Error, TEXT("Opening the Desktop application (%s %s) failed."), *DesktopAppPath, *CommandLineArguments);
-		FPlatformProcess::CloseProc(Proc);
-	}
+	UnityVersionControlUtils::OpenDesktopApplication();
 }
 
 void FUnityVersionControlMenu::OpenBranchesWindow() const
 {
 	FUnityVersionControlModule::Get().GetBranchesWindow().OpenTab();
+}
+
+void FUnityVersionControlMenu::OpenChangesetsWindow() const
+{
+	FUnityVersionControlModule::Get().GetChangesetsWindow().OpenTab();
 }
 
 void FUnityVersionControlMenu::OpenLocksWindow() const
@@ -781,10 +777,11 @@ void FUnityVersionControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 		Provider.IsPartialWorkspace() ? LOCTEXT("PlasticDesktopAppTooltip", "Open the workspace in Unity Version Control Gluon Application.") : LOCTEXT("PlasticGluonTooltip", "Open the workspace in Unity Version Control Desktop Application."),
 		FSlateIcon(FUnityVersionControlStyle::Get().GetStyleSetName(), Provider.IsPartialWorkspace() ? "UnityVersionControl.GluonIcon.Small" : "UnityVersionControl.PluginIcon.Small"),
 #endif
-		FUIAction(FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::OpenDeskoptApp))
+		FUIAction(FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::OpenDesktopApplication))
 	);
 
 	AddViewBranches(Menu);
+	AddViewChangesets(Menu);
 	AddViewLocks(Menu);
 }
 
@@ -802,13 +799,35 @@ void FUnityVersionControlMenu::AddViewBranches(FToolMenuSection& Menu)
 		LOCTEXT("PlasticBranchesWindowTooltip", "Open the Branches window."),
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Branch"),
-#elif ENGINE_MAJOR_VERSION == 5
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
-#elif ENGINE_MAJOR_VERSION == 4
+#else
 		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Branch"),
 #endif
 		FUIAction(
 			FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::OpenBranchesWindow),
+			FCanExecuteAction()
+		)
+	);
+}
+
+#if ENGINE_MAJOR_VERSION == 4
+void FUnityVersionControlMenu::AddViewChangesets(FMenuBuilder& Menu)
+#elif ENGINE_MAJOR_VERSION == 5
+void FUnityVersionControlMenu::AddViewChangesets(FToolMenuSection& Menu)
+#endif
+{
+	Menu.AddMenuEntry(
+#if ENGINE_MAJOR_VERSION == 5
+		TEXT("PlasticChangesetsWindow"),
+#endif
+		LOCTEXT("PlasticChangesetsWindow", "View Changesets"),
+		LOCTEXT("PlasticChangesetsWindowTooltip", "Open the Changesets window."),
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.History"),
+#else
+		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.History"),
+#endif
+		FUIAction(
+			FExecuteAction::CreateRaw(this, &FUnityVersionControlMenu::OpenChangesetsWindow),
 			FCanExecuteAction()
 		)
 	);

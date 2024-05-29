@@ -3,6 +3,7 @@
 #include "UnityVersionControlParsers.h"
 
 #include "UnityVersionControlBranch.h"
+#include "UnityVersionControlChangeset.h"
 #include "UnityVersionControlLock.h"
 #include "UnityVersionControlModule.h"
 #include "UnityVersionControlProvider.h"
@@ -58,9 +59,10 @@ bool ParseProfileInfo(TArray<FString>& InResults, const FString& InServerUrl, FS
  * Parse  workspace information, in the form "Branch /main@UE5PlasticPluginDev@localhost:8087"
  *                                        or "Branch /main@UE5PlasticPluginDev@test@cloud" (when connected to the cloud)
  *                                        or "Branch /main@rep:UE5OpenWorldPerfTest@repserver:test@cloud"
- *                                        or "Changeset 1234@UE5PlasticPluginDev@test@cloud" (when the workspace is switched on a changeset instead of a branch)
+ *                                        or "Changeset 1234@UE5PlasticPluginDev@test@cloud" (when the workspace is switched to a changeset instead of a branch)
+ *                                        or "Label 1.10.0@UE5PlasticPluginDev@test@cloud" (when the workspace is switched to a label instead of a branch)
 */
-bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl)
+bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutWorkspaceSelector, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl)
 {
 	if (InResults.Num() == 0)
 	{
@@ -72,9 +74,11 @@ bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FStr
 	static const FString LabelPrefix(TEXT("Label "));
 	static const FString RepPrefix(TEXT("rep:"));
 	static const FString RepserverPrefix(TEXT("repserver:"));
+	bool bIsABranch = false;
 	FString& WorkspaceInfo = InResults[0];
 	if (WorkspaceInfo.StartsWith(BranchPrefix, ESearchCase::CaseSensitive))
 	{
+		bIsABranch = true;
 		WorkspaceInfo.RightChopInline(BranchPrefix.Len());
 	}
 	else if (WorkspaceInfo.StartsWith(ChangesetPrefix, ESearchCase::CaseSensitive))
@@ -94,7 +98,11 @@ bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FStr
 	WorkspaceInfo.ParseIntoArray(WorkspaceInfos, TEXT("@"), false); // Don't cull empty values
 	if (WorkspaceInfos.Num() >= 3)
 	{
-		OutBranchName = MoveTemp(WorkspaceInfos[0]);
+		OutWorkspaceSelector = MoveTemp(WorkspaceInfos[0]);
+		if (bIsABranch)
+		{
+			OutBranchName = OutWorkspaceSelector;
+		}
 		OutRepositoryName = MoveTemp(WorkspaceInfos[1]);
 		OutServerUrl = MoveTemp(WorkspaceInfos[2]);
 
@@ -123,7 +131,7 @@ bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FStr
 }
 
 /**
-* Parse the current changeset from the header returned by "cm status --machinereadable --header --fieldseparator=;"
+* Parse the current changeset from the header returned by "cm status --machinereadable --fieldseparator=;"
 *
 * Get workspace status in one of the form
 STATUS;41;UEPlasticPluginDev;localhost:8087
@@ -535,6 +543,7 @@ void ParseFileinfoResults(const TArray<FString>& InResults, TArray<FUnityVersion
 	ensureMsgf(InResults.Num() == InOutStates.Num(), TEXT("The fileinfo command should gives the same number of infos as the status command"));
 
 	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+	// Note: here is one of the rare places where we need to use a branch name, not a workspace selector
 	const FString& BranchName = Provider.GetBranchName();
 
 	TArray<FUnityVersionControlLockRef> Locks;
@@ -670,6 +679,31 @@ static FString DecodeXmlEntities(const FString& InString)
 }
 
 /**
+ * Parse one specific node of the result of the 'cm history --moveddeleted' command.
+ *
+ * Results of the history command in case of a move looks like that:
+ <Branch>Moved from /Content/FirstPersonBP/Blueprints/BP_ToRename.uasset to /Content/FirstPersonBP/Blueprints/BP_TestsRenamed.uasset</Branch>
+*/
+static FString ParseMovedFrom(const FXmlNode* InBranchNode)
+{
+	FString MovedFrom;
+
+	if (InBranchNode != nullptr)
+	{
+		static const int32 MovedFromPrefixLen = FString("Moved from /").Len();
+		MovedFrom = InBranchNode->GetContent().RightChop(MovedFromPrefixLen);
+
+		const int32 MovedToIndex = MovedFrom.Find(TEXT(" to "), ESearchCase::CaseSensitive);
+		if (MovedToIndex != INDEX_NONE)
+		{
+			MovedFrom.LeftInline(MovedToIndex);
+		}
+	}
+
+	return MovedFrom; // Convert server path to absolute
+}
+
+/**
  * Parse results of the 'cm history --moveddeleted --xml --encoding="utf-8"' command.
  *
  * Results of the history command looks like that:
@@ -741,10 +775,10 @@ static FString DecodeXmlEntities(const FString& InString)
 */
 static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InXmlResult, TArray<FUnityVersionControlState>& InOutStates)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseHistoryResults);
-
 	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+	const FString& WorkspaceRoot = Provider.GetPathToWorkspaceRoot();
 	const FString RootRepSpec = FString::Printf(TEXT("%s@%s"), *Provider.GetRepositoryName(), *Provider.GetServerUrl());
+	const FString CurrentBranch = Provider.GetBranchName();
 
 	static const FString RevisionHistoriesResult(TEXT("RevisionHistoriesResult"));
 	static const FString RevisionHistories(TEXT("RevisionHistories"));
@@ -782,7 +816,7 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 			continue;
 		}
 
-		const FString Filename = ItemNameNode->GetContent();
+		FString Filename = ItemNameNode->GetContent();
 		FUnityVersionControlState* InOutStatePtr = InOutStates.FindByPredicate(
 			[&Filename](const FUnityVersionControlState& State) { return State.LocalFilename == Filename; }
 		);
@@ -804,12 +838,9 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 			InOutState.History.Reserve(RevisionNodes.Num());
 		}
 
-		// parse history in reverse: needed to get most recent at the top (implied by the UI)
-		// Note: limit to last 100 changes, like Perforce
-		static const int32 MaxRevisions = 100;
-		const int32 MinIndex = FMath::Max(0, RevisionNodes.Num() - MaxRevisions);
-		bool bNextEntryIsAMove = false;
-		for (int32 RevisionIndex = RevisionNodes.Num() - 1; RevisionIndex >= MinIndex; RevisionIndex--)
+		// parse history in reverse: needed to get most recent at the top (required by Unreal Editor for the "Diff with depot" using the index 0)
+		FString NextEntryMovedFrom;
+		for (int32 RevisionIndex = RevisionNodes.Num() - 1; RevisionIndex >= 0; RevisionIndex--)
 		{
 			const FXmlNode* RevisionNode = RevisionNodes[RevisionIndex];
 			check(RevisionNode);
@@ -826,16 +857,21 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 				// => Since the parsing is done in reverse order, the detection of a Move need to apply to the next entry
 				if (RevisionTypeNode->GetContent().IsEmpty())
 				{
-					// Empty RevisionType signals a Move: Raises a flag to treat the next entry as a Move, and skip this one as it is empty (it's just an additional entry with data for the move)
-					bNextEntryIsAMove = true;
+					// An empty <RevisionType> signals a Move: save the "MovedFrom" filename to treat the next entry as a Move and update the Filename accordingly for next (older) entries
+					NextEntryMovedFrom = FPaths::Combine(WorkspaceRoot, ParseMovedFrom(RevisionNode->FindChildNode(Branch)));
+
+					// and skip this revision as it is empty (it's just an additional entry with data for the move)
 					continue;
 				}
 				else
 				{
-					if (bNextEntryIsAMove)
+					// If this entry was flagged as a move:
+					if (NextEntryMovedFrom.Len() > 0)
 					{
-						bNextEntryIsAMove = false;
+						// Set this revision as a Move
 						SourceControlRevision->Action = SourceControlActionMoved;
+						// Update Filename for next (older) entries in the history and clear the NextEntryMovedFrom used as a flag
+						Filename = MoveTemp(NextEntryMovedFrom);
 					}
 					else if (RevisionIndex == 0)
 					{
@@ -900,6 +936,7 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 			// since we usually don't want to display changes from other branches in the History window...
 			// except in case of a merge conflict, where the Editor expects the tip of the "source (remote)" branch to be at the top of the history!
 			if (   (SourceControlRevision->ChangesetNumber > InOutState.DepotRevisionChangeset)
+				&& (SourceControlRevision->Branch != CurrentBranch)
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 				&& (SourceControlRevision->GetRevision() != InOutState.PendingResolveInfo.RemoteRevision))
 #else
@@ -933,17 +970,18 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 	return true;
 }
 
-bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InResultFilename, TArray<FUnityVersionControlState>& InOutStates)
+bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InXmlFilename, TArray<FUnityVersionControlState>& InOutStates)
 {
 	bool bResult = false;
 
 	FXmlFile XmlFile;
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseHistoryResults::FXmlFile::LoadFile);
-		bResult = XmlFile.LoadFile(InResultFilename);
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseHistoryResults::LoadXml);
+		bResult = XmlFile.LoadFile(InXmlFilename);
 	}
 	if (bResult)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseHistoryResults::ParseXml);
 		bResult = ParseHistoryResults(bInUpdateHistory, XmlFile, InOutStates);
 	}
 	else
@@ -970,8 +1008,6 @@ bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InResultFil
 */
 static bool ParseUpdateResults(const FXmlFile& InXmlResult, TArray<FString>& OutFiles)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseUpdateResults);
-
 	static const FString UpdatedItems(TEXT("UpdatedItems"));
 	static const FString List(TEXT("List"));
 	static const FString UpdatedItem(TEXT("UpdatedItem"));
@@ -1012,11 +1048,12 @@ bool ParseUpdateResults(const FString& InResults, TArray<FString>& OutFiles)
 
 	FXmlFile XmlFile;
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseUpdateResults::FXmlFile::LoadFile);
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseUpdateResults::LoadXml);
 		bResult = XmlFile.LoadFile(InResults, EConstructMethod::ConstructFromBuffer);
 	}
 	if (bResult)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseUpdateResults::ParseXml);
 		bResult = ParseUpdateResults(XmlFile, OutFiles);
 	}
 	else
@@ -1063,6 +1100,8 @@ bool ParseUpdateResults(const TArray<FString>& InResults, TArray<FString>& OutFi
 /// Parse checkin result, usually looking like "Created changeset cs:8@br:/main@MyProject@SRombauts@cloud (mount:'/')"
 FText ParseCheckInResults(const TArray<FString>& InResults)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseCheckInResults);
+
 	if (InResults.Num() > 0)
 	{
 		static const FString ChangesetPrefix(TEXT("Created changeset "));
@@ -1124,8 +1163,6 @@ FText ParseCheckInResults(const TArray<FString>& InResults)
 */
 static bool ParseChangelistsResults(const FXmlFile& InXmlResult, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseChangelistsResults);
-
 	static const FString StatusOutput(TEXT("StatusOutput"));
 	static const FString WkConfigType(TEXT("WkConfigType"));
 	static const FString WkConfigName(TEXT("WkConfigName"));
@@ -1137,6 +1174,7 @@ static bool ParseChangelistsResults(const FXmlFile& InXmlResult, TArray<FUnityVe
 	static const FString Change(TEXT("Change"));
 	static const FString Type(TEXT("Type"));
 	static const FString Path(TEXT("Path"));
+	static const FString OldPath(TEXT("OldPath"));
 
 	FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
 	const FString& WorkspaceRoot = Provider.GetPathToWorkspaceRoot();
@@ -1180,17 +1218,33 @@ static bool ParseChangelistsResults(const FXmlFile& InXmlResult, TArray<FUnityVe
 					continue;
 				}
 
-				// Here we make sure to only collect file states, not directories, since we shouldn't display the added directories to the Editor
-				FString FileName = PathNode->GetContent();
-				int32 DotIndex;
-				if (FileName.FindChar(TEXT('.'), DotIndex))
+				FUnityVersionControlState FileState(FPaths::ConvertRelativePathToFull(WorkspaceRoot, PathNode->GetContent()));
+				FileState.Changelist = ChangelistState.Changelist;
+				if (const FXmlNode* TypeNode = ChangeNode->FindChildNode(Type))
 				{
-					FUnityVersionControlState FileState(FPaths::ConvertRelativePathToFull(WorkspaceRoot, MoveTemp(FileName)));
-					FileState.Changelist = ChangelistState.Changelist;
-					if (const FXmlNode* TypeNode = ChangeNode->FindChildNode(Type))
+					FileState.WorkspaceState = StateFromStatus(TypeNode->GetContent(), bUsesCheckedOutChanged);
+				}
+
+				if (FileState.WorkspaceState == EWorkspaceState::Moved)
+				{
+					if (const FXmlNode* OldPathNode = ChangeNode->FindChildNode(OldPath))
 					{
-						FileState.WorkspaceState = StateFromStatus(TypeNode->GetContent(), bUsesCheckedOutChanged);
+						FileState.MovedFrom = FPaths::ConvertRelativePathToFull(WorkspaceRoot, OldPathNode->GetContent());
 					}
+				}
+
+				// Note: in case of a Moved file, it appears twice in the list; just update the first entry (set as a "Changed") with the "Move" status
+				if (FUnityVersionControlState* ExistingState = OutCLFilesStates[ChangelistIndex].FindByPredicate(
+					[&FileState](const FUnityVersionControlState& InState)
+					{
+						return InState.GetFilename().Equals(FileState.GetFilename());
+					}))
+				{
+					ExistingState->WorkspaceState = FileState.WorkspaceState;
+					ExistingState->MovedFrom = FileState.MovedFrom;
+				}
+				else
+				{
 					OutCLFilesStates[ChangelistIndex].Add(MoveTemp(FileState));
 				}
 			}
@@ -1212,17 +1266,18 @@ static bool ParseChangelistsResults(const FXmlFile& InXmlResult, TArray<FUnityVe
 	return true;
 }
 
-bool ParseChangelistsResults(const FString& InResultFilename, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates)
+bool ParseChangelistsResults(const FString& InXmlFilename, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates)
 {
 	bool bResult = false;
 
 	FXmlFile XmlFile;
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseChangelistsResults::FXmlFile::LoadFile);
-		bResult = XmlFile.LoadFile(InResultFilename);
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseChangelistsResults::LoadXml);
+		bResult = XmlFile.LoadFile(InXmlFilename);
 	}
 	if (bResult)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseChangelistsResults::ParseXml);
 		bResult = ParseChangelistsResults(XmlFile, OutChangelistsStates, OutCLFilesStates);
 	}
 	else
@@ -1387,11 +1442,12 @@ bool ParseShelvesResults(const FString& InResults, TArray<FUnityVersionControlCh
 
 	FXmlFile XmlFile;
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseShelvesResults);
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseShelvesResults::LoadXml);
 		bResult = XmlFile.LoadFile(InResults, EConstructMethod::ConstructFromBuffer);
 	}
 	if (bResult)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseShelvesResults::ParseXml);
 		bResult = ParseShelvesResults(XmlFile, InOutChangelistsStates);
 	}
 	else
@@ -1407,12 +1463,14 @@ bool ParseShelvesResults(const FString& InResults, TArray<FUnityVersionControlCh
  *
  * Results of the diff command looks like that:
 C;666;Content\NewFolder\BP_CheckedOut.uasset
- * but for Moved assets there are two entires that we need to merge:
+ * but for Moved assets there are two entries that we need to merge:
 C;266;"Content\ThirdPerson\Blueprints\BP_ThirdPersonCharacterRenamed.uasset"
 M;-1;"Content\ThirdPerson\Blueprints\BP_ThirdPersonCharacterRenamed.uasset"
 */
 bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InResults, TArray<FUnityVersionControlRevision>& OutBaseRevisions)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseShelveDiffResults);
+
 	bool bResult = true;
 
 	OutBaseRevisions.Reset(InResults.Num());
@@ -1432,7 +1490,7 @@ bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InR
 
 			if (ShelveState == EWorkspaceState::Moved)
 			{
-				// In case of a Moved file, it appears twice in the list, so update the first entry (set as a "Changed" but has the Base Revision Id) and update it with the "Move" status
+				// Note: in case of a Moved file, it appears twice in the list; just update the first entry (set as a "Changed") with the "Move" status
 				if (FUnityVersionControlRevision* ExistingShelveRevision = OutBaseRevisions.FindByPredicate(
 					[&AbsoluteFilename](const FUnityVersionControlRevision& State)
 					{
@@ -1526,11 +1584,12 @@ bool ParseShelvesResult(const FString& InResults, FString& OutComment, FDateTime
 
 	FXmlFile XmlFile;
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseShelvesResult);
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseShelvesResult::LoadXml);
 		bResult = XmlFile.LoadFile(InResults, EConstructMethod::ConstructFromBuffer);
 	}
 	if (bResult)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseShelvesResult::ParseXml);
 		int32 ShelveId;
 		bResult = UnityVersionControlParsers::ParseShelvesResult(XmlFile, ShelveId, OutComment, OutDate, OutOwner);
 	}
@@ -1543,6 +1602,326 @@ bool ParseShelvesResult(const FString& InResults, FString& OutComment, FDateTime
 }
 
 #endif
+
+
+/**
+ * Parse results of the 'cm find changeset --xml --encoding="utf-8"' command.
+ *
+ * Results of the find command looks like the following:
+<?xml version="1.0" encoding="utf-8" ?>
+<PLASTICQUERY>
+  <CHANGESET>
+    <ID>2652</ID>
+    <CHANGESETID>56</CHANGESETID>
+    <COMMENT>test</COMMENT>
+    <DATE>2024-03-25T10:37:14+01:00</DATE>
+    <OWNER>sebastien.rombauts@unity3d.com</OWNER>
+    <REPOSITORY>UE5PlasticPluginDev</REPOSITORY>
+    <REPNAME>UE5PlasticPluginDev</REPNAME>
+    <REPSERVER>SRombautsU@cloud</REPSERVER>
+    <BRANCH>/main</BRANCH>
+    <PARENT>55</PARENT>
+    <GUID>d49c552e-9654-44d0-86eb-0d55fa5e8dc3</GUID>
+    <ROOTREV>2651</ROOTREV>
+  </CHANGESET>
+  [...]
+</PLASTICQUERY>
+*/
+static bool ParseChangesetesResults(const FXmlFile& InXmlResult, TArray<FUnityVersionControlChangesetRef>& OutChangesets)
+{
+	static const FString PlasticQuery(TEXT("PLASTICQUERY"));
+	static const FString ChangesetId(TEXT("CHANGESETID"));
+	static const FString Branch(TEXT("BRANCH"));
+	static const FString Comment(TEXT("COMMENT"));
+	static const FString Owner(TEXT("OWNER"));
+	static const FString Date(TEXT("DATE"));
+
+	const FXmlNode* PlasticQueryNode = InXmlResult.GetRootNode();
+	if (PlasticQueryNode == nullptr || PlasticQueryNode->GetTag() != PlasticQuery)
+	{
+		return false;
+	}
+
+	const TArray<FXmlNode*>& ChangesetsNodes = PlasticQueryNode->GetChildrenNodes();
+	OutChangesets.Reserve(ChangesetsNodes.Num());
+	for (const FXmlNode* ChangesetNode : ChangesetsNodes)
+	{
+		check(ChangesetNode);
+		const FXmlNode* ChangesetIdNode = ChangesetNode->FindChildNode(ChangesetId);
+		if (ChangesetIdNode == nullptr)
+		{
+			continue;
+		}
+
+		FUnityVersionControlChangesetRef ChangesetRef = MakeShareable(new FUnityVersionControlChangeset());
+
+		ChangesetRef->ChangesetId = FCString::Atoi(*ChangesetIdNode->GetContent());
+
+		if (const FXmlNode* CommentNode = ChangesetNode->FindChildNode(Comment))
+		{
+			ChangesetRef->Comment = DecodeXmlEntities(CommentNode->GetContent());
+		}
+		if (const FXmlNode* BranchNode = ChangesetNode->FindChildNode(Branch))
+		{
+			ChangesetRef->Branch = DecodeXmlEntities(BranchNode->GetContent());
+		}
+		if (const FXmlNode* OwnerNode = ChangesetNode->FindChildNode(Owner))
+		{
+			// Note: keeping the full email address as the owner name so we can display both the short and full name in the tooltip
+			ChangesetRef->CreatedBy = OwnerNode->GetContent();
+		}
+		if (const FXmlNode* DateNode = ChangesetNode->FindChildNode(Date))
+		{
+			const FString& DateIso = DateNode->GetContent();
+			FDateTime::ParseIso8601(*DateIso, ChangesetRef->Date);
+		}
+
+		OutChangesets.Add(MoveTemp(ChangesetRef));
+	}
+
+	return true;
+}
+
+bool ParseChangesetsResults(const FString& InXmlFilename, TArray<FUnityVersionControlChangesetRef>& OutChangesets)
+{
+	bool bResult = false;
+
+	FXmlFile XmlFile;
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseChangesetesResults::LoadXml);
+		bResult = XmlFile.LoadFile(InXmlFilename);
+	}
+	if (bResult)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseChangesetesResults::ParseXml);
+		bResult = ParseChangesetesResults(XmlFile, OutChangesets);
+	}
+	else
+	{
+		UE_LOG(LogSourceControl, Error, TEXT("ParseChangesetesResults: XML parse error '%s'"), *XmlFile.GetLastError())
+	}
+
+	return bResult;
+}
+
+
+/**
+ * Convert the type of change in the log of changesets to a state.
+ */
+static EWorkspaceState StateFromType(const FString& InChangeType)
+{
+	static const FString Added(TEXT("Added"));
+	static const FString Changed(TEXT("Changed"));
+	static const FString Deleted(TEXT("Deleted"));
+	static const FString Moved(TEXT("Moved"));
+
+	if (InChangeType.Equals(Changed))
+	{
+		return EWorkspaceState::CheckedOutChanged;
+	}
+	else if (InChangeType.Equals(Added))
+	{
+		return EWorkspaceState::Added;
+	}
+	else if (InChangeType.Equals(Moved))
+	{
+		return EWorkspaceState::Moved;
+	}
+	else if (InChangeType.Equals(Deleted))
+	{
+		return EWorkspaceState::Deleted;
+	}
+
+	return EWorkspaceState::Unknown;
+}
+
+/**
+ * Parse Changes child node in a Changeset.
+ *
+ * Results of the log command looks like the following:
+<?xml version="1.0" encoding="utf-8"?>
+<LogList>
+  <Changeset>
+	[...]
+	<Changes>
+	  <Item>
+		<Branch>/main/test</Branch>
+		<RevNo>72</RevNo>
+		<Owner>sebastien.rombauts@unity3d.com</Owner>
+		<RevId>2861</RevId>
+		<ParentRevId>-1</ParentRevId>
+		<SrcCmPath>/Private/Private.md</SrcCmPath>
+		<SrcParentItemId>2868</SrcParentItemId>
+		<DstCmPath>/Private/Private.md</DstCmPath>
+		<DstParentItemId>2868</DstParentItemId>
+		<Date>2024-04-03T14:59:31+02:00</Date>
+		<Type>Added</Type>
+	  </Item>
+	[...]
+	</Changes>
+	[...]
+  </Changeset>
+</LogList>
+ */
+static void ParseChangesInChangeset(const FXmlNode* InChangesetNode, const FUnityVersionControlChangesetRef& InChangeset, TArray<FUnityVersionControlStateRef>& OutFiles)
+{
+	static const FString Changes(TEXT("Changes"));
+	static const FString Item(TEXT("Item"));
+	static const FString Type(TEXT("Type"));
+	static const FString SrcCmPath(TEXT("SrcCmPath"));
+	static const FString DstCmPath(TEXT("DstCmPath"));
+
+	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
+	const FString RootRepSpec = FString::Printf(TEXT("%s@%s"), *Provider.GetRepositoryName(), *Provider.GetServerUrl());
+
+	if (const FXmlNode* ChangesNode = InChangesetNode->FindChildNode(Changes))
+	{
+		const TArray<FXmlNode*>& ItemNodes = ChangesNode->GetChildrenNodes();
+		OutFiles.Reserve(ItemNodes.Num());
+		for (const FXmlNode* ItemNode : ItemNodes)
+		{
+			check(ItemNode);
+
+			const FXmlNode* PathNode = ItemNode->FindChildNode(DstCmPath);
+			const FXmlNode* TypeNode = ItemNode->FindChildNode(Type);
+			if ((PathNode == nullptr) || (TypeNode == nullptr))
+			{
+				continue;
+			}
+
+			// Note: remove the leading '/' from the server path to make it relative to the root of the workspace
+			FString FileName = PathNode->GetContent().RightChop(1);
+			const EWorkspaceState WorkspaceState = StateFromType(TypeNode->GetContent());
+			FUnityVersionControlStateRef State = MakeShareable(new FUnityVersionControlState(MoveTemp(FileName), WorkspaceState));
+			State->RepSpec = RootRepSpec;
+
+			if (WorkspaceState == EWorkspaceState::Moved)
+			{
+				if (const FXmlNode* SrcNode = ItemNode->FindChildNode(SrcCmPath))
+				{
+					State->MovedFrom = SrcNode->GetContent().RightChop(1); // remove the leading '/' character from the server path
+				}
+			}
+
+			// Add one revision to be able to fetch the file content for diff, if it's not marked for deletion.
+			if ((WorkspaceState != EWorkspaceState::Deleted) && (State->History.Num() == 0))
+			{
+				const TSharedRef<FUnityVersionControlRevision, ESPMode::ThreadSafe> SourceControlRevision = MakeShareable(new FUnityVersionControlRevision);
+				SourceControlRevision->State = &State.Get();
+				SourceControlRevision->Filename = State->GetFilename();
+				SourceControlRevision->Revision = FString::Printf(TEXT("cs:%d"), InChangeset->ChangesetId);
+				SourceControlRevision->ChangesetNumber = InChangeset->ChangesetId; // Note: for display in the diff window only
+				SourceControlRevision->Date = InChangeset->Date; // Note: not yet used for display as of UE5.2
+
+				State->History.Add(SourceControlRevision);
+			}
+
+			// Note: in case of a Moved file, it appears twice in the list; just update the first entry (set as a "Changed") with the "Move" status
+			if (FUnityVersionControlStateRef* ExistingState = OutFiles.FindByPredicate(
+				[&State](const TSharedRef<FUnityVersionControlState, ESPMode::ThreadSafe>& InState)
+				{
+					return InState->GetFilename().Equals(State->GetFilename());
+				}))
+			{
+				(*ExistingState)->WorkspaceState = State->WorkspaceState;
+				(*ExistingState)->MovedFrom = State->MovedFrom;
+			}
+			else
+			{
+				OutFiles.Add(MoveTemp(State));
+			}
+		}
+	}
+}
+
+/**
+ * Parse results of the 'cm log cs:<ChangesetId> --xml --encoding="utf-8"' command.
+ *
+ * Results of the log command looks like the following:
+<?xml version="1.0" encoding="utf-8"?>
+<LogList>
+  <Changeset>
+	<ObjId>2674</ObjId>
+	<ChangesetId>73</ChangesetId>
+	<Branch>/main/test</Branch>
+	<Comment>private files and folders</Comment>
+	<Owner>sebastien.rombauts@unity3d.com</Owner>
+	<GUID>cd803bd1-7d59-4573-b9de-1a4e684d573a</GUID>
+	<Changes>
+	  <Item>
+		<Branch>/main/test</Branch>
+		<RevNo>72</RevNo>
+		<Owner>sebastien.rombauts@unity3d.com</Owner>
+		<RevId>2861</RevId>
+		<ParentRevId>-1</ParentRevId>
+		<SrcCmPath>/Private/Private.md</SrcCmPath>
+		<SrcParentItemId>2868</SrcParentItemId>
+		<DstCmPath>/Private/Private.md</DstCmPath>
+		<DstParentItemId>2868</DstParentItemId>
+		<Date>2024-04-03T14:59:31+02:00</Date>
+		<Type>Added</Type>
+	  </Item>
+	[...]
+	</Changes>
+	<Date>2024-04-02T16:20:11+02:00</Date>
+  </Changeset>
+</LogList>
+*/
+static bool ParseLogResults(const FXmlFile& InXmlResult, const FUnityVersionControlChangesetRef& InChangeset, TArray<FUnityVersionControlStateRef>& OutFiles)
+{
+	static const FString LogList(TEXT("LogList"));
+	static const FString ChangesetId(TEXT("ChangesetId"));
+	static const FString Branch(TEXT("Branch"));
+	static const FString Comment(TEXT("Comment"));
+	static const FString Owner(TEXT("Owner"));
+	static const FString Date(TEXT("Date"));
+
+	const FXmlNode* LogListNode = InXmlResult.GetRootNode();
+	if (LogListNode == nullptr || LogListNode->GetTag() != LogList)
+	{
+		return false;
+	}
+
+	const TArray<FXmlNode*>& ChangesetsNodes = LogListNode->GetChildrenNodes();
+	if (ChangesetsNodes.Num() != 1 || ChangesetsNodes[0] == nullptr)
+	{
+		return false;
+	}
+
+	FXmlNode* ChangesetNode = ChangesetsNodes[0];
+	const FXmlNode* ChangesetIdNode = ChangesetNode->FindChildNode(ChangesetId);
+	if (ChangesetIdNode == nullptr || InChangeset->ChangesetId != FCString::Atoi(*ChangesetIdNode->GetContent()))
+	{
+		return false;
+	}
+
+	// List Files States and create a Revision
+	ParseChangesInChangeset(ChangesetNode, InChangeset, OutFiles);
+
+	return true;
+}
+
+bool ParseLogResults(const FString& InXmlFilename, const FUnityVersionControlChangesetRef& InChangeset, TArray<FUnityVersionControlStateRef>& OutFiles)
+{
+	bool bResult = false;
+
+	FXmlFile XmlFile;
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseLogResults::LoadXml);
+		bResult = XmlFile.LoadFile(InXmlFilename);
+	}
+	if (bResult)
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseLogResults::ParseXml);
+		bResult = ParseLogResults(XmlFile, InChangeset, OutFiles);
+	}
+	else
+	{
+		UE_LOG(LogSourceControl, Error, TEXT("ParseLogResults: XML parse error '%s'"), *XmlFile.GetLastError())
+	}
+
+	return bResult;
+}
 
 /**
  * Parse results of the 'cm find "branches where date >= 'YYYY-MM-DD' or changesets >= 'YYYY-MM-DD'" --xml --encoding="utf-8"' command.
@@ -1584,9 +1963,9 @@ static bool ParseBranchesResults(const FXmlFile& InXmlResult, TArray<FUnityVersi
 		return false;
 	}
 
-	const TArray<FXmlNode*>& BranchsNodes = PlasticQueryNode->GetChildrenNodes();
-	OutBranches.Reserve(BranchsNodes.Num());
-	for (const FXmlNode* BranchNode : BranchsNodes)
+	const TArray<FXmlNode*>& BranchesNodes = PlasticQueryNode->GetChildrenNodes();
+	OutBranches.Reserve(BranchesNodes.Num());
+	for (const FXmlNode* BranchNode : BranchesNodes)
 	{
 		check(BranchNode);
 		const FXmlNode* NameNode = BranchNode->FindChildNode(Name);
@@ -1603,18 +1982,16 @@ static bool ParseBranchesResults(const FXmlFile& InXmlResult, TArray<FUnityVersi
 		{
 			BranchRef->Comment = DecodeXmlEntities(CommentNode->GetContent());
 		}
-
 		if (const FXmlNode* DateNode = BranchNode->FindChildNode(Date))
 		{
 			const FString& DateIso = DateNode->GetContent();
 			FDateTime::ParseIso8601(*DateIso, BranchRef->Date);
 		}
-
 		if (const FXmlNode* OwnerNode = BranchNode->FindChildNode(Owner))
 		{
+			// Note: keeping the full email address as the owner name so we can display both the short and full name in the tooltip
 			BranchRef->CreatedBy = OwnerNode->GetContent();
 		}
-
 		if (const FXmlNode* RepNameNode = BranchNode->FindChildNode(RepName))
 		{
 			if (const FXmlNode* RepServerNode = BranchNode->FindChildNode(RepServer))
@@ -1629,17 +2006,18 @@ static bool ParseBranchesResults(const FXmlFile& InXmlResult, TArray<FUnityVersi
 	return true;
 }
 
-bool ParseBranchesResults(const FString& InResults, TArray<FUnityVersionControlBranchRef>& OutBranches)
+bool ParseBranchesResults(const FString& InXmlFilename, TArray<FUnityVersionControlBranchRef>& OutBranches)
 {
 	bool bResult = false;
 
 	FXmlFile XmlFile;
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseBranchesResults);
-		bResult = XmlFile.LoadFile(InResults, EConstructMethod::ConstructFromBuffer);
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseBranchesResults::LoadXml);
+		bResult = XmlFile.LoadFile(InXmlFilename);
 	}
 	if (bResult)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseBranchesResults::ParseXml);
 		bResult = ParseBranchesResults(XmlFile, OutBranches);
 	}
 	else
@@ -1674,8 +2052,6 @@ bool ParseBranchesResults(const FString& InResults, TArray<FUnityVersionControlB
 */
 static bool ParseMergeResults(const FXmlFile& InXmlResult, TArray<FString>& OutFiles)
 {
-	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlUtils::ParseMergeResults);
-
 	static const FString Merge(TEXT("Merge"));
 	static const FString Added(TEXT("Added"));
 	static const FString Deleted(TEXT("Deleted"));
@@ -1724,11 +2100,12 @@ bool ParseMergeResults(const FString& InResult, TArray<FString>& OutFiles)
 
 	FXmlFile XmlFile;
 	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseMergeResults::FXmlFile::LoadFile);
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseMergeResults::LoadXml);
 		bResult = XmlFile.LoadFile(InResult, EConstructMethod::ConstructFromBuffer);
 	}
 	if (bResult)
 	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlParsers::ParseMergeResults::ParseXml);
 		bResult = ParseMergeResults(XmlFile, OutFiles);
 	}
 	else

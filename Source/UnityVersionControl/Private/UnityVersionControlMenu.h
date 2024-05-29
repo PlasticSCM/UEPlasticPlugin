@@ -32,8 +32,9 @@ public:
 	void VisitDocsURLClicked() const;
 	void VisitSupportURLClicked() const;
 	void VisitLockRulesURLClicked(const FString InOrganizationName) const;
-	void OpenDeskoptApp() const;
+	void OpenDesktopApplication() const;
 	void OpenBranchesWindow() const;
+	void OpenChangesetsWindow() const;
 	void OpenLocksWindow() const;
 
 private:
@@ -42,12 +43,14 @@ private:
 #if ENGINE_MAJOR_VERSION == 4
 	void AddMenuExtension(FMenuBuilder& Menu);
 	void AddViewBranches(FMenuBuilder& Menu);
+	void AddViewChangesets(FMenuBuilder& Menu);
 	void AddViewLocks(FMenuBuilder& Menu);
 
 	TSharedRef<class FExtender> OnExtendLevelEditorViewMenu(const TSharedRef<class FUICommandList> CommandList);
 #elif ENGINE_MAJOR_VERSION == 5
 	void AddMenuExtension(FToolMenuSection& Menu);
 	void AddViewBranches(FToolMenuSection& Menu);
+	void AddViewChangesets(FToolMenuSection& Menu);
 	void AddViewLocks(FToolMenuSection& Menu);
 #endif
 

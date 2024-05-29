@@ -11,6 +11,8 @@ class FUnityVersionControlLock;
 class FUnityVersionControlRevision;
 class FUnityVersionControlState;
 typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
+typedef TSharedRef<class FUnityVersionControlChangeset, ESPMode::ThreadSafe> FUnityVersionControlChangesetRef;
+typedef TSharedRef<class FUnityVersionControlState, ESPMode::ThreadSafe> FUnityVersionControlStateRef;
 
 namespace UnityVersionControlParsers
 {
@@ -53,7 +55,7 @@ struct FRemoveRedundantErrors
 
 bool ParseProfileInfo(TArray<FString>& InResults, const FString& InServerUrl, FString& OutUserName);
 
-bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl);
+bool ParseWorkspaceInfo(TArray<FString>& InResults, FString& OutWorkspaceSelector, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl);
 
 bool GetChangesetFromWorkspaceStatus(const TArray<FString>& InResults, int32& OutChangeset);
 
@@ -63,7 +65,7 @@ void ParseDirectoryStatusResult(const FString& InDir, const TArray<FString>& InR
 
 void ParseFileinfoResults(const TArray<FString>& InResults, TArray<FUnityVersionControlState>& InOutStates);
 
-bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InResultFilename, TArray<FUnityVersionControlState>& InOutStates);
+bool ParseHistoryResults(const bool bInUpdateHistory, const FString& InXmlFilename, TArray<FUnityVersionControlState>& InOutStates);
 
 bool ParseUpdateResults(const FString& InResults, TArray<FString>& OutFiles);
 bool ParseUpdateResults(const TArray<FString>& InResults, TArray<FString>& OutFiles);
@@ -72,7 +74,7 @@ FText ParseCheckInResults(const TArray<FString>& InResults);
 
 #if ENGINE_MAJOR_VERSION == 5
 
-bool ParseChangelistsResults(const FString& InResultFilename, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates);
+bool ParseChangelistsResults(const FString& InXmlFilename, TArray<FUnityVersionControlChangelistState>& OutChangelistsStates, TArray<TArray<FUnityVersionControlState>>& OutCLFilesStates);
 
 bool ParseShelveDiffResult(const FString InWorkspaceRoot, TArray<FString>&& InResults, FUnityVersionControlChangelistState& InOutChangelistsState);
 bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InResults, TArray<FUnityVersionControlRevision>& OutBaseRevisions);
@@ -82,7 +84,10 @@ bool ParseShelvesResult(const FString& InResults, FString& OutComment, FDateTime
 
 #endif
 
-bool ParseBranchesResults(const FString& InResults, TArray<FUnityVersionControlBranchRef>& OutBranches);
+bool ParseChangesetsResults(const FString& InXmlFilename, TArray<FUnityVersionControlChangesetRef>& OutChangesets);
+bool ParseLogResults(const FString& InXmlFilename, const FUnityVersionControlChangesetRef& InChangeset, TArray<FUnityVersionControlStateRef>& OutFiles);
+
+bool ParseBranchesResults(const FString& InXmlFilename, TArray<FUnityVersionControlBranchRef>& OutBranches);
 
 bool ParseMergeResults(const FString& InResult, TArray<FString>& OutFiles);
 

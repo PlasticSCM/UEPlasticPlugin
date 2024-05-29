@@ -6,6 +6,7 @@
 #include "UnityVersionControlOperations.h"
 #include "UnityVersionControlProjectSettings.h"
 #include "UnityVersionControlBranch.h"
+#include "UnityVersionControlUtils.h"
 #include "UnityVersionControlVersions.h"
 #include "SUnityVersionControlBranchRow.h"
 #include "SUnityVersionControlCreateBranch.h"
@@ -32,6 +33,7 @@
 #endif
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Docking/TabManager.h"
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Layout/SSpacer.h"
@@ -45,15 +47,19 @@
 void SUnityVersionControlBranchesWidget::Construct(const FArguments& InArgs)
 {
 	ISourceControlModule::Get().RegisterProviderChanged(FSourceControlProviderChanged::FDelegate::CreateSP(this, &SUnityVersionControlBranchesWidget::OnSourceControlProviderChanged));
+	// register for any source control change to detect any change of branch from the Changesets window
+	SourceControlStateChangedDelegateHandle = ISourceControlModule::Get().GetProvider().RegisterSourceControlStateChanged_Handle(FSourceControlStateChanged::FDelegate::CreateSP(this, &SUnityVersionControlBranchesWidget::HandleSourceControlStateChanged));
 
-	CurrentBranchName = FUnityVersionControlModule::Get().GetProvider().GetBranchName();
+	WorkspaceSelector = FUnityVersionControlModule::Get().GetProvider().GetWorkspaceSelector();
 
 	SearchTextFilter = MakeShared<TTextFilter<const FUnityVersionControlBranch&>>(TTextFilter<const FUnityVersionControlBranch&>::FItemToStringArray::CreateSP(this, &SUnityVersionControlBranchesWidget::PopulateItemSearchStrings));
 	SearchTextFilter->OnChanged().AddSP(this, &SUnityVersionControlBranchesWidget::OnRefreshUI);
 
 	FromDateInDaysValues.Add(TPair<int32, FText>(7, FText::FromString(TEXT("Last week"))));
+	FromDateInDaysValues.Add(TPair<int32, FText>(15, FText::FromString(TEXT("Last 15 days"))));
 	FromDateInDaysValues.Add(TPair<int32, FText>(30, FText::FromString(TEXT("Last month"))));
-	FromDateInDaysValues.Add(TPair<int32, FText>(90, FText::FromString(TEXT("Last 3 months"))));
+	FromDateInDaysValues.Add(TPair<int32, FText>(91, FText::FromString(TEXT("Last 3 months"))));
+	FromDateInDaysValues.Add(TPair<int32, FText>(182, FText::FromString(TEXT("Last 6 months"))));
 	FromDateInDaysValues.Add(TPair<int32, FText>(365, FText::FromString(TEXT("Last year"))));
 	FromDateInDaysValues.Add(TPair<int32, FText>(-1, FText::FromString(TEXT("All time"))));
 
@@ -67,51 +73,166 @@ void SUnityVersionControlBranchesWidget::Construct(const FArguments& InArgs)
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 			.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
 #else
-			.BorderImage(FEditorStyle::GetBrush("DetailsView.CategoryBottom"))
+			.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
 #endif
 			.Padding(4.0f)
 			[
 				SNew(SHorizontalBox)
 				+SHorizontalBox::Slot()
-				.HAlign(HAlign_Left)
+				.FillWidth(1.0f)
+				[
+					SNew(SHorizontalBox)
+					+SHorizontalBox::Slot()
+					.HAlign(HAlign_Left)
+					.VAlign(VAlign_Center)
+					.AutoWidth()
+					[
+						CreateToolBar()
+					]
+					+SHorizontalBox::Slot()
+					.MaxWidth(10.0f)
+					[
+						SNew(SSpacer)
+					]
+					+SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.MaxWidth(300.0f)
+					[
+						SAssignNew(BranchSearchBox, SSearchBox)
+						.HintText(LOCTEXT("SearchBranches", "Search Branches"))
+						.ToolTipText(LOCTEXT("PlasticBranchesSearch_Tooltip", "Filter the list of branches by keyword."))
+						.OnTextChanged(this, &SUnityVersionControlBranchesWidget::OnSearchTextChanged)
+					]
+					+SHorizontalBox::Slot()
+					.VAlign(VAlign_Center)
+					.MaxWidth(125.0f)
+					.Padding(10.f, 0.f)
+					[
+						SNew(SComboButton)
+						.ToolTipText(LOCTEXT("PlasticBranchesDate_Tooltip", "Filter the list of branches by date of activity."))
+						.OnGetMenuContent(this, &SUnityVersionControlBranchesWidget::BuildFromDateDropDownMenu)
+						.ButtonContent()
+						[
+							SNew(STextBlock)
+							.Text_Lambda([this]() { return FromDateInDaysValues[FromDateInDays]; })
+						]
+					]
+				]
+				+SHorizontalBox::Slot()
+				.HAlign(HAlign_Right)
 				.VAlign(VAlign_Center)
 				.AutoWidth()
 				[
-					CreateToolBar()
-				]
-				+SHorizontalBox::Slot()
-				.MaxWidth(10.0f)
-				[
-					SNew(SSpacer)
-				]
-				+SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.MaxWidth(300.0f)
-				[
-					SAssignNew(FileSearchBox, SSearchBox)
-					.HintText(LOCTEXT("SearchBranches", "Search Branches"))
-					.ToolTipText(LOCTEXT("PlasticBranchesSearch_Tooltip", "Filter the list of branches by keyword."))
-					.OnTextChanged(this, &SUnityVersionControlBranchesWidget::OnSearchTextChanged)
-				]
-				+SHorizontalBox::Slot()
-				.VAlign(VAlign_Center)
-				.MaxWidth(125.0f)
-				.Padding(10.f, 0.f)
-				[
-					SNew(SComboButton)
-					.ToolTipText(LOCTEXT("PlasticBranchesDate_Tooltip", "Filter the list of branches by date of creation."))
-					.OnGetMenuContent(this, &SUnityVersionControlBranchesWidget::BuildFromDateDropDownMenu)
-					.ButtonContent()
+					// Button to open the Changesets View
+					SNew(SButton)
+					.ContentPadding(FMargin(6.0f, 0.0f))
+					.ToolTipText(LOCTEXT("PlasticChangesetsWindowTooltip", "Open the Changesets window."))
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+#elif ENGINE_MAJOR_VERSION == 5
+					.ButtonStyle(FEditorStyle::Get(), "SimpleButton")
+#endif
+					.OnClicked_Lambda([]()
+						{
+							FUnityVersionControlModule::Get().GetChangesetsWindow().OpenTab();
+							return FReply::Handled();
+						})
 					[
-						SNew(STextBlock)
-						.Text_Lambda([this]() { return FromDateInDaysValues[FromDateInDays]; })
+						SNew(SHorizontalBox)
+						+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						.HAlign(HAlign_Center)
+						[
+							SNew(SImage)
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+							.Image(FAppStyle::GetBrush("SourceControl.Actions.History"))
+#else
+							.Image(FEditorStyle::GetBrush("SourceControl.Actions.History"))
+#endif
+						]
+						+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						.Padding(5.0f, 0.0f, 0.0f, 0.0f)
+						[
+							SNew(STextBlock)
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+							.TextStyle(&FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
+#else
+							.TextStyle(&FEditorStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
+#endif
+							.Text(LOCTEXT("PlasticChangesetsWindow", "Changesets"))
+						]
+					]
+				]
+				+SHorizontalBox::Slot()
+				.HAlign(HAlign_Right)
+				.VAlign(VAlign_Center)
+				.AutoWidth()
+				[
+					// Button to open the Branch Explorer
+					SNew(SButton)
+					.ContentPadding(FMargin(6.0f, 0.0f))
+					.ToolTipText(LOCTEXT("PlasticBranchExplorerTooltip", "Open the Branch Explorer of the Desktop Application for the current workspace."))
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
+#elif ENGINE_MAJOR_VERSION == 5
+					.ButtonStyle(FEditorStyle::Get(), "SimpleButton")
+#endif
+					.OnClicked_Lambda([]()
+						{
+							UnityVersionControlUtils::OpenDesktopApplication(true);
+							return FReply::Handled();
+						})
+					[
+						SNew(SHorizontalBox)
+						+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						.HAlign(HAlign_Center)
+						[
+							SNew(SImage)
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+							.Image(FAppStyle::GetBrush("SourceControl.Branch"))
+#else
+							.Image(FEditorStyle::GetBrush("SourceControl.Branch"))
+#endif
+						]
+						+SHorizontalBox::Slot()
+						.AutoWidth()
+						.VAlign(VAlign_Center)
+						.Padding(5.0f, 0.0f, 0.0f, 0.0f)
+						[
+							SNew(STextBlock)
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
+							.TextStyle(&FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
+#else
+							.TextStyle(&FEditorStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
+#endif
+							.Text(LOCTEXT("OpenBranchExplorer", "Branch Explorer"))
+						]
 					]
 				]
 			]
 		]
 		+SVerticalBox::Slot() // The main content: the list of branches
 		[
-			CreateContentPanel()
+			SNew(SVerticalBox)
+			+SVerticalBox::Slot()
+			[
+				CreateContentPanel()
+			]
+			+SVerticalBox::Slot()
+			.VAlign(VAlign_Center)
+			.HAlign(HAlign_Center)
+			.FillHeight(1.0f)
+			[
+				// Text to display when there is no branch displayed
+				SNew(STextBlock)
+				.Text(LOCTEXT("NoBranch", "There is no branch to display."))
+				.Visibility_Lambda([this]() { return SourceControlBranches.Num() ? EVisibility::Collapsed : EVisibility::Visible; })
+			]
 		]
 		+SVerticalBox::Slot() // Status bar (Always visible)
 		.AutoHeight()
@@ -132,7 +253,7 @@ void SUnityVersionControlBranchesWidget::Construct(const FArguments& InArgs)
 				.HAlign(HAlign_Right)
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this]() { return FText::FromString(CurrentBranchName); })
+					.Text_Lambda([this]() { return FText::FromString(WorkspaceSelector); })
 					.ToolTipText(LOCTEXT("PlasticBranchCurrent_Tooltip", "Current branch."))
 				]
 			]
@@ -149,8 +270,7 @@ TSharedRef<SWidget> SUnityVersionControlBranchesWidget::CreateToolBar()
 #endif
 
 	ToolBarBuilder.AddToolBarButton(
-		FUIAction(
-			FExecuteAction::CreateLambda([this]() { RequestBranchesRefresh(); })),
+		FUIAction(FExecuteAction::CreateLambda([this]() { bShouldRefresh = true; })),
 		NAME_None,
 		LOCTEXT("SourceControl_RefreshButton", "Refresh"),
 		LOCTEXT("SourceControl_RefreshButton_Tooltip", "Refreshes branches from revision control provider."),
@@ -187,11 +307,11 @@ TSharedRef<SWidget> SUnityVersionControlBranchesWidget::CreateContentPanel()
 	}
 
 	TSharedRef<SListView<FUnityVersionControlBranchRef>> BranchView = SNew(SListView<FUnityVersionControlBranchRef>)
-		.ItemHeight(24.0f)
 		.ListItemsSource(&BranchRows)
 		.OnGenerateRow(this, &SUnityVersionControlBranchesWidget::OnGenerateRow)
 		.SelectionMode(ESelectionMode::Multi)
 		.OnContextMenuOpening(this, &SUnityVersionControlBranchesWidget::OnOpenContextMenu)
+		.OnMouseButtonDoubleClick(this, &SUnityVersionControlBranchesWidget::OnItemDoubleClicked)
 		.OnItemToString_Debug_Lambda([this](FUnityVersionControlBranchRef Branch) { return Branch->Name; })
 		.HeaderRow
 		(
@@ -249,11 +369,11 @@ TSharedRef<SWidget> SUnityVersionControlBranchesWidget::CreateContentPanel()
 
 TSharedRef<ITableRow> SUnityVersionControlBranchesWidget::OnGenerateRow(FUnityVersionControlBranchRef InBranch, const TSharedRef<STableViewBase>& OwnerTable)
 {
-	const bool bIsCurrentBranch = InBranch->Name == CurrentBranchName;
+	const bool bIsCurrentBranch = InBranch->Name == WorkspaceSelector;
 	return SNew(SUnityVersionControlBranchRow, OwnerTable)
 		.BranchToVisualize(InBranch)
 		.bIsCurrentBranch(bIsCurrentBranch)
-		.HighlightText_Lambda([this]() { return FileSearchBox->GetText(); });
+		.HighlightText_Lambda([this]() { return BranchSearchBox->GetText(); });
 }
 
 void SUnityVersionControlBranchesWidget::OnHiddenColumnsListChanged()
@@ -293,7 +413,7 @@ void SUnityVersionControlBranchesWidget::OnHiddenColumnsListChanged()
 void SUnityVersionControlBranchesWidget::OnSearchTextChanged(const FText& InFilterText)
 {
 	SearchTextFilter->SetRawFilterText(InFilterText);
-	FileSearchBox->SetError(SearchTextFilter->GetFilterErrorText());
+	BranchSearchBox->SetError(SearchTextFilter->GetFilterErrorText());
 }
 
 void SUnityVersionControlBranchesWidget::PopulateItemSearchStrings(const FUnityVersionControlBranch& InItem, TArray<FString>& OutStrings)
@@ -304,8 +424,7 @@ void SUnityVersionControlBranchesWidget::PopulateItemSearchStrings(const FUnityV
 void SUnityVersionControlBranchesWidget::OnFromDateChanged(int32 InFromDateInDays)
 {
 	FromDateInDays = InFromDateInDays;
-
-	RequestBranchesRefresh();
+	bShouldRefresh = true;
 }
 
 TSharedRef<SWidget> SUnityVersionControlBranchesWidget::BuildFromDateDropDownMenu()
@@ -417,7 +536,11 @@ void SUnityVersionControlBranchesWidget::SortBranchView()
 
 	auto CompareRepository = [](const FUnityVersionControlBranch* Lhs, const FUnityVersionControlBranch* Rhs)
 	{
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+		return UE::ComparisonUtility::CompareNaturalOrder(*Lhs->Repository, *Rhs->Repository);
+#else
 		return FCString::Stricmp(*Lhs->Repository, *Rhs->Repository);
+#endif
 	};
 
 	auto CompareCreatedBy = [](const FUnityVersionControlBranch* Lhs, const FUnityVersionControlBranch* Rhs)
@@ -543,7 +666,7 @@ TSharedPtr<SWidget> SUnityVersionControlBranchesWidget::OnOpenContextMenu()
 		return nullptr;
 	}
 	const bool bSingleSelection = !SelectedBranch.IsEmpty();
-	const bool bSingleNotCurrent = bSingleSelection && (SelectedBranch != CurrentBranchName);
+	const bool bSingleNotCurrent = bSingleSelection && (SelectedBranch != WorkspaceSelector);
 
 	const bool bMergeXml = FUnityVersionControlModule::Get().GetProvider().GetPlasticScmVersion() >= UnityVersionControlVersions::MergeXml;
 
@@ -570,7 +693,7 @@ TSharedPtr<SWidget> SUnityVersionControlBranchesWidget::OnOpenContextMenu()
 		FText::FromString(SelectedBranch)));
 	const FText& CreateChildBranchTooltipDynamic = bSingleSelection ? CreateChildBranchTooltip : SelectASingleBranchTooltip;
 	Section.AddMenuEntry(
-		TEXT("CreateChildBranch"),
+		"CreateChildBranch",
 		LOCTEXT("CreateChildBranch", "Create child branch..."),
 		CreateChildBranchTooltipDynamic,
 		FSlateIcon(),
@@ -586,7 +709,7 @@ TSharedPtr<SWidget> SUnityVersionControlBranchesWidget::OnOpenContextMenu()
 		bSingleNotCurrent ? SwitchToBranchTooltip :
 		bSingleSelection ? SelectADifferentBranchTooltip : SelectASingleBranchTooltip;
 	Section.AddMenuEntry(
-		TEXT("SwitchToBranch"),
+		"SwitchToBranch",
 		LOCTEXT("SwitchToBranch", "Switch workspace to this branch"),
 		SwitchToBranchTooltipDynamic,
 		FSlateIcon(),
@@ -599,13 +722,13 @@ TSharedPtr<SWidget> SUnityVersionControlBranchesWidget::OnOpenContextMenu()
 	Section.AddSeparator("PlasticSeparator1");
 
 	const FText MergeBranchTooltip(FText::Format(LOCTEXT("MergeBranchTooltip", "Merge this branch {0} into the current branch {1}"),
-		FText::FromString(SelectedBranch), FText::FromString(CurrentBranchName)));
+		FText::FromString(SelectedBranch), FText::FromString(WorkspaceSelector)));
 	const FText& MergeBranchTooltipDynamic =
 		!bMergeXml ? UpdateUVCSTooltip :
 		bSingleNotCurrent ? MergeBranchTooltip :
 		bSingleSelection ? SelectADifferentBranchTooltip : SelectASingleBranchTooltip;
 	Section.AddMenuEntry(
-		TEXT("MergeBranch"),
+		"MergeBranch",
 		LOCTEXT("MergeBranch", "Merge from this branch..."),
 		MergeBranchTooltipDynamic,
 		FSlateIcon(),
@@ -621,7 +744,7 @@ TSharedPtr<SWidget> SUnityVersionControlBranchesWidget::OnOpenContextMenu()
 		FText::FromString(SelectedBranch)));
 	const FText& RenameBranchTooltipDynamic = bSingleSelection ? RenameBranchTooltip : SelectASingleBranchTooltip;
 	Section.AddMenuEntry(
-		TEXT("RenameBranch"),
+		"RenameBranch",
 		LOCTEXT("RenameBranch", "Rename..."),
 		RenameBranchTooltipDynamic,
 		FSlateIcon(),
@@ -634,7 +757,7 @@ TSharedPtr<SWidget> SUnityVersionControlBranchesWidget::OnOpenContextMenu()
 		FText::Format(LOCTEXT("DeleteBranchTooltip", "Delete the branch {0}"), FText::FromString(SelectedBranch)) :
 		LOCTEXT("DeleteBranchesTooltip", "Delete the selected branches.");
 	Section.AddMenuEntry(
-		TEXT("DeleteBranch"),
+		"DeleteBranch",
 		LOCTEXT("DeleteBranch", "Delete"),
 		DeleteBranchTooltip,
 		FSlateIcon(),
@@ -731,7 +854,7 @@ void SUnityVersionControlBranchesWidget::OnSwitchToBranchClicked(FString InBranc
 
 		// Launch a custom "Switch" operation
 		FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
-		TSharedRef<FPlasticSwitchToBranch, ESPMode::ThreadSafe> SwitchToBranchOperation = ISourceControlOperation::Create<FPlasticSwitchToBranch>();
+		TSharedRef<FPlasticSwitch, ESPMode::ThreadSafe> SwitchToBranchOperation = ISourceControlOperation::Create<FPlasticSwitch>();
 		SwitchToBranchOperation->BranchName = InBranchName;
 		const ECommandResult::Type Result = Provider.Execute(SwitchToBranchOperation, TArray<FString>(), EConcurrency::Asynchronous, FSourceControlOperationComplete::CreateSP(this, &SUnityVersionControlBranchesWidget::OnSwitchToBranchOperationComplete));
 		if (Result == ECommandResult::Succeeded)
@@ -756,7 +879,7 @@ void SUnityVersionControlBranchesWidget::OnSwitchToBranchClicked(FString InBranc
 
 void SUnityVersionControlBranchesWidget::OnMergeBranchClicked(FString InBranchName)
 {
-	const FText MergeBranchQuestion = FText::Format(LOCTEXT("MergeBranchDialog", "Merge branch {0} into the current branch {1}?"), FText::FromString(InBranchName), FText::FromString(CurrentBranchName));
+	const FText MergeBranchQuestion = FText::Format(LOCTEXT("MergeBranchDialog", "Merge branch {0} into the current branch {1}?"), FText::FromString(InBranchName), FText::FromString(WorkspaceSelector));
 	const EAppReturnType::Type Choice = FMessageDialog::Open(
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		EAppMsgCategory::Info,
@@ -983,7 +1106,7 @@ void SUnityVersionControlBranchesWidget::OnGetBranchesOperationComplete(const FS
 	TSharedRef<FPlasticGetBranches, ESPMode::ThreadSafe> OperationGetBranches = StaticCastSharedRef<FPlasticGetBranches>(InOperation);
 	SourceControlBranches = MoveTemp(OperationGetBranches->Branches);
 
-	CurrentBranchName = FUnityVersionControlModule::Get().GetProvider().GetBranchName();
+	WorkspaceSelector = FUnityVersionControlModule::Get().GetProvider().GetWorkspaceSelector();
 
 	EndRefreshStatus();
 	OnRefreshUI();
@@ -1021,7 +1144,7 @@ void SUnityVersionControlBranchesWidget::OnSwitchToBranchOperationComplete(const
 	TRACE_CPUPROFILER_EVENT_SCOPE(SUnityVersionControlBranchesWidget::OnSwitchToBranchOperationComplete);
 
 	// Reload packages that where updated by the SwitchToBranch operation (and the current map if needed)
-	TSharedRef<FPlasticSwitchToBranch, ESPMode::ThreadSafe> SwitchToBranchOperation = StaticCastSharedRef<FPlasticSwitchToBranch>(InOperation);
+	TSharedRef<FPlasticSwitch, ESPMode::ThreadSafe> SwitchToBranchOperation = StaticCastSharedRef<FPlasticSwitch>(InOperation);
 	PackageUtils::ReloadPackages(SwitchToBranchOperation->UpdatedFiles);
 
 	// Ask for a full refresh of the list of branches (and don't call EndRefreshStatus() yet)
@@ -1082,42 +1205,62 @@ void SUnityVersionControlBranchesWidget::OnSourceControlProviderChanged(ISourceC
 	}
 }
 
+void SUnityVersionControlBranchesWidget::SwitchToBranchWithConfirmation(const FString& InSelectedBranch)
+{
+	const FText SwitchToBranchQuestion = FText::Format(LOCTEXT("SwitchToBranchDialog", "Switch workspace to branch {0}?"), FText::FromString(InSelectedBranch));
+	const EAppReturnType::Type Choice = FMessageDialog::Open(
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+		EAppMsgCategory::Info,
+#endif
+		EAppMsgType::YesNo, SwitchToBranchQuestion
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+		, LOCTEXT("SwitchToBranchTitle", "Switch Branch?")
+#endif
+	);
+	if (Choice == EAppReturnType::Yes)
+	{
+		OnSwitchToBranchClicked(InSelectedBranch);
+	}
+}
+
+void SUnityVersionControlBranchesWidget::HandleSourceControlStateChanged()
+{
+	if (WorkspaceSelector != FUnityVersionControlModule::Get().GetProvider().GetWorkspaceSelector())
+	{
+		bShouldRefresh = true;
+	}
+}
+
+void SUnityVersionControlBranchesWidget::OnItemDoubleClicked(FUnityVersionControlBranchRef InBranch)
+{
+	// Double click switches to the selected branch (with a confirmation dialog)
+	if (InBranch->Name != WorkspaceSelector)
+	{
+		SwitchToBranchWithConfirmation(InBranch->Name);
+	}
+}
+
 FReply SUnityVersionControlBranchesWidget::OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent)
 {
 	if (InKeyEvent.GetKey() == EKeys::F5)
 	{
 		// Pressing F5 refreshes the list of branches
-		RequestBranchesRefresh();
+		bShouldRefresh = true;
 		return FReply::Handled();
 	}
 	else if (InKeyEvent.GetKey() == EKeys::Enter)
 	{
-		// Pressing Enter switches to the selected branch.
+		// Pressing Enter switches to the selected branch (with a confirmation dialog)
 		const TArray<FString> SelectedBranches = GetSelectedBranches();
-		if (SelectedBranches.Num() == 1)
+		if (SelectedBranches.Num() == 1 && SelectedBranches[0] != WorkspaceSelector)
 		{
-			const FString& SelectedBranch = SelectedBranches[0];
-			// Note: this action require a confirmation dialog (while the Delete below already have one in OnDeleteBranchesClicked()).
-			const FText SwitchToBranchQuestion = FText::Format(LOCTEXT("SwitchToBranchDialog", "Switch workspace to branch {0}?"), FText::FromString(SelectedBranch));
-			const EAppReturnType::Type Choice = FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-				EAppMsgCategory::Info,
-#endif
-				EAppMsgType::YesNo, SwitchToBranchQuestion
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
-				, LOCTEXT("SwitchToBranchTitle", "Switch Branch?")
-#endif
-			);
-			if (Choice == EAppReturnType::Yes)
-			{
-				OnSwitchToBranchClicked(SelectedBranch);
-			}
+			SwitchToBranchWithConfirmation(SelectedBranches[0]);
 		}
 		return FReply::Handled();
 	}
 	else if (InKeyEvent.GetKey() == EKeys::F2)
 	{
-		// Pressing F2 renames the selected branches
+		// Pressing F2 renames the selected branches (with a dialog)
 		const TArray<FString> SelectedBranches = GetSelectedBranches();
 		if (SelectedBranches.Num() == 1)
 		{
@@ -1128,7 +1271,7 @@ FReply SUnityVersionControlBranchesWidget::OnKeyDown(const FGeometry& MyGeometry
 	}
 	else if ((InKeyEvent.GetKey() == EKeys::Delete) || (InKeyEvent.GetKey() == EKeys::BackSpace))
 	{
-		// Pressing Delete or BackSpace deletes the selected branches
+		// Pressing Delete or BackSpace deletes the selected branches (with a confirmation dialog)
 		const TArray<FString> SelectedBranches = GetSelectedBranches();
 		if (SelectedBranches.Num() > 0)
 		{

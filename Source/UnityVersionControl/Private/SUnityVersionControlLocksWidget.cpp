@@ -27,6 +27,7 @@
 #else
 #include "EditorStyleSet.h"
 #endif
+#include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Layout/SSpacer.h"
@@ -42,7 +43,7 @@ void SUnityVersionControlLocksWidget::Construct(const FArguments& InArgs)
 	// register for any source control change to detect new local locks on check-out, and release of them on check-in
 	SourceControlStateChangedDelegateHandle = ISourceControlModule::Get().GetProvider().RegisterSourceControlStateChanged_Handle(FSourceControlStateChanged::FDelegate::CreateSP(this, &SUnityVersionControlLocksWidget::HandleSourceControlStateChanged));
 
-	CurrentBranchName = FUnityVersionControlModule::Get().GetProvider().GetBranchName();
+	WorkspaceSelector = FUnityVersionControlModule::Get().GetProvider().GetWorkspaceSelector();
 
 	const FString OrganizationName = FUnityVersionControlModule::Get().GetProvider().GetCloudOrganization();
 
@@ -59,7 +60,7 @@ void SUnityVersionControlLocksWidget::Construct(const FArguments& InArgs)
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 			.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
 #else
-			.BorderImage(FEditorStyle::GetBrush("DetailsView.CategoryBottom"))
+			.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
 #endif
 			.Padding(4.0f)
 			[
@@ -84,7 +85,7 @@ void SUnityVersionControlLocksWidget::Construct(const FArguments& InArgs)
 					.VAlign(VAlign_Center)
 					.MaxWidth(300.0f)
 					[
-						SAssignNew(FileSearchBox, SSearchBox)
+						SAssignNew(LockSearchBox, SSearchBox)
 						.HintText(LOCTEXT("SearchLocks", "Search Locks"))
 						.ToolTipText(LOCTEXT("PlasticLocksSearch_Tooltip", "Filter the list of locks by keyword."))
 						.OnTextChanged(this, &SUnityVersionControlLocksWidget::OnSearchTextChanged)
@@ -104,7 +105,7 @@ void SUnityVersionControlLocksWidget::Construct(const FArguments& InArgs)
 						LOCTEXT("PlasticLockRulesURLTooltipEnabled", "Navigate to lock rules configuration page in the Unity Dashboard."))
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-#else
+#elif ENGINE_MAJOR_VERSION == 5
 					.ButtonStyle(FEditorStyle::Get(), "SimpleButton")
 #endif
 					.OnClicked(this, &SUnityVersionControlLocksWidget::OnConfigureLockRulesClicked, OrganizationName)
@@ -141,7 +142,21 @@ void SUnityVersionControlLocksWidget::Construct(const FArguments& InArgs)
 		]
 		+SVerticalBox::Slot() // The main content: the list of locks
 		[
-			CreateContentPanel()
+			SNew(SVerticalBox)
+			+SVerticalBox::Slot()
+			[
+				CreateContentPanel()
+			]
+			+SVerticalBox::Slot()
+			.VAlign(VAlign_Center)
+			.HAlign(HAlign_Center)
+			.FillHeight(1.0f)
+			[
+				// Text to display when there is no lock displayed
+				SNew(STextBlock)
+				.Text(LOCTEXT("NoLock", "There is no lock to display."))
+				.Visibility_Lambda([this]() { return SourceControlLocks.Num() ? EVisibility::Collapsed : EVisibility::Visible; })
+			]
 		]
 		+SVerticalBox::Slot() // Status bar (Always visible)
 		.AutoHeight()
@@ -162,7 +177,7 @@ void SUnityVersionControlLocksWidget::Construct(const FArguments& InArgs)
 				.HAlign(HAlign_Right)
 				[
 					SNew(STextBlock)
-					.Text_Lambda([this]() { return FText::FromString(CurrentBranchName); })
+					.Text_Lambda([this]() { return FText::FromString(WorkspaceSelector); })
 					.ToolTipText(LOCTEXT("PlasticBranchCurrent_Tooltip", "Current branch."))
 				]
 			]
@@ -179,8 +194,11 @@ TSharedRef<SWidget> SUnityVersionControlLocksWidget::CreateToolBar()
 #endif
 
 	ToolBarBuilder.AddToolBarButton(
-		FUIAction(
-			FExecuteAction::CreateLambda([this]() { RequestLocksRefresh(true); })),
+		FUIAction(FExecuteAction::CreateLambda([this]()
+		{
+			bShouldRefresh = true;
+			bShouldInvalidateLocksCache = true;
+		})),
 		NAME_None,
 		LOCTEXT("SourceControl_RefreshButton", "Refresh"),
 		LOCTEXT("SourceControl_RefreshButton_Tooltip", "Refreshes locks from revision control provider."),
@@ -217,7 +235,6 @@ TSharedRef<SWidget> SUnityVersionControlLocksWidget::CreateContentPanel()
 	}
 
 	TSharedRef<SListView<FUnityVersionControlLockRef>> LockView = SNew(SListView<FUnityVersionControlLockRef>)
-		.ItemHeight(24.0f)
 		.ListItemsSource(&LockRows)
 		.OnGenerateRow(this, &SUnityVersionControlLocksWidget::OnGenerateRow)
 		.SelectionMode(ESelectionMode::Multi)
@@ -308,7 +325,7 @@ TSharedRef<ITableRow> SUnityVersionControlLocksWidget::OnGenerateRow(FUnityVersi
 {
 	return SNew(SUnityVersionControlLockRow, OwnerTable)
 		.LockToVisualize(InLock)
-		.HighlightText_Lambda([this]() { return FileSearchBox->GetText(); });
+		.HighlightText_Lambda([this]() { return LockSearchBox->GetText(); });
 }
 
 void SUnityVersionControlLocksWidget::OnHiddenColumnsListChanged()
@@ -348,7 +365,7 @@ void SUnityVersionControlLocksWidget::OnHiddenColumnsListChanged()
 void SUnityVersionControlLocksWidget::OnSearchTextChanged(const FText& InFilterText)
 {
 	SearchTextFilter->SetRawFilterText(InFilterText);
-	FileSearchBox->SetError(SearchTextFilter->GetFilterErrorText());
+	LockSearchBox->SetError(SearchTextFilter->GetFilterErrorText());
 }
 
 void SUnityVersionControlLocksWidget::PopulateItemSearchStrings(const FUnityVersionControlLock& InItem, TArray<FString>& OutStrings)
@@ -443,7 +460,7 @@ void SUnityVersionControlLocksWidget::SortLockView()
 
 	auto CompareItemIds = [](const FUnityVersionControlLock* Lhs, const FUnityVersionControlLock* Rhs)
 	{
-		return (Lhs->ItemId < Rhs->ItemId);
+		return Lhs->ItemId < Rhs->ItemId ? -1 : (Lhs->ItemId == Rhs->ItemId ? 0 : 1);
 	};
 
 	auto CompareStatuses = [](const FUnityVersionControlLock* Lhs, const FUnityVersionControlLock* Rhs)
@@ -622,7 +639,7 @@ TSharedPtr<SWidget> SUnityVersionControlLocksWidget::OnOpenContextMenu()
 	FToolMenuSection& Section = *Menu->FindSection("Source Control");
 
 	Section.AddMenuEntry(
-		TEXT("ReleaseLock"),
+		"ReleaseLock",
 		LOCTEXT("ReleaseLock", "Release"),
 		LOCTEXT("ReleaseLocksTooltip", "Release Lock(s) on the selected assets.\nReleasing locks will allow other users to keep working on these files and retrieve locks (on the same branch, in the latest revision)."),
 		FSlateIcon(),
@@ -632,7 +649,7 @@ TSharedPtr<SWidget> SUnityVersionControlLocksWidget::OnOpenContextMenu()
 		)
 	);
 	Section.AddMenuEntry(
-		TEXT("RemoveLock"),
+		"RemoveLock",
 		LOCTEXT("RemoveLock", "Remove"),
 		LOCTEXT("RemoveLocksTooltip", "Remove Lock(s) on the selected assets.\nRemoving locks will allow other users to edit these files anywhere (on any branch) increasing the risk of future merge conflicts."),
 		FSlateIcon(),
@@ -727,8 +744,9 @@ void SUnityVersionControlLocksWidget::Tick(const FGeometry& AllottedGeometry, co
 
 	if (bShouldRefresh)
 	{
-		RequestLocksRefresh(false);
+		RequestLocksRefresh(bShouldInvalidateLocksCache);
 		bShouldRefresh = false;
+		bShouldInvalidateLocksCache = false;
 	}
 
 	if (bIsRefreshing)
@@ -785,7 +803,7 @@ void SUnityVersionControlLocksWidget::OnGetLocksOperationComplete(const FSourceC
 	TSharedRef<FPlasticGetLocks, ESPMode::ThreadSafe> OperationGetLocks = StaticCastSharedRef<FPlasticGetLocks>(InOperation);
 	SourceControlLocks = MoveTemp(OperationGetLocks->Locks);
 
-	CurrentBranchName = FUnityVersionControlModule::Get().GetProvider().GetBranchName();
+	WorkspaceSelector = FUnityVersionControlModule::Get().GetProvider().GetWorkspaceSelector();
 
 	EndRefreshStatus();
 	OnRefreshUI();
@@ -830,7 +848,8 @@ FReply SUnityVersionControlLocksWidget::OnKeyDown(const FGeometry& MyGeometry, c
 	if (InKeyEvent.GetKey() == EKeys::F5)
 	{
 		// Pressing F5 refreshes the list of locks
-		RequestLocksRefresh(true);
+		bShouldRefresh = true;
+		bShouldInvalidateLocksCache = true;
 		return FReply::Handled();
 	}
 	else if ((InKeyEvent.GetKey() == EKeys::Delete) || (InKeyEvent.GetKey() == EKeys::BackSpace))

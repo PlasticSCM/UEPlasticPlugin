@@ -21,6 +21,7 @@ void FUnityVersionControlModule::StartupModule()
 
 	/// Register our tab Window here as it needs to be ready for the editor to reload at startup
 	UnityVersionControlBranchesWindow.Register();
+	UnityVersionControlChangesetsWindow.Register();
 	UnityVersionControlLocksWindow.Register();
 }
 
@@ -30,6 +31,7 @@ void FUnityVersionControlModule::ShutdownModule()
 	UnityVersionControlProvider.Close();
 
 	UnityVersionControlBranchesWindow.Unregister();
+	UnityVersionControlChangesetsWindow.Unregister();
 	UnityVersionControlLocksWindow.Unregister();
 
 	// unbind provider from editor

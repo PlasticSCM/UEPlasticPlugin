@@ -45,7 +45,8 @@ Quick tour "Branching with Unity Version Control (Plastic SCM) in Unreal Engine 
     - [Redirectors](#redirectors)
     - [Detect Changes on other Branches](#detect-changes-on-other-branches)
     - [Branches](#branches)
-    - [SmartLocks](#smartlocks)
+    - [Changesets History](#changesets-history)
+    - [SmartLocks](#smartLocks)
     - [Merge conflicts on Blueprints](#merge-conflicts-on-blueprints)
     - [Workflows](#workflows)
       - [Mainline](#mainline)
@@ -195,7 +196,7 @@ enc_temp_folder
 .idea
 .vscode
 .vs
-.vsconfig
+.ignore
 *.VC.db
 *.opensdf
 *.opendb
@@ -438,6 +439,18 @@ Merging a branch into the current one:
 
 Deleting the selected branches:  
 ![Delete Branches Dialog](Screenshots/UEPlasticPlugin-DeleteBranches-Dialog.png)
+
+##### Changesets History
+
+The plugin has a new dedicated window to display the history of Changesets, to search and filter them, diff them and view their changes, or switch to any of them or their underlying branch.
+
+To open it, use the "View Changesets" menu item in the Revision Control menu.
+
+View history of Changesets window, with a context menu to interact with these changesets:
+![View Changesets window](Screenshots/UEPlasticPlugin-Changesets-Menu.png)
+
+It displays the list of files changed in the selected changeset and 
+![Files in Changeset context menu](Screenshots/UEPlasticPlugin-ChangesetsFiles-Menu.png)
 
 #### SmartLocks
 

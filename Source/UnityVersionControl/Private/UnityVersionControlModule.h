@@ -9,6 +9,7 @@
 #include "UnityVersionControlWorkspaceCreation.h"
 
 #include "UnityVersionControlBranchesWindow.h"
+#include "UnityVersionControlChangesetsWindow.h"
 #include "UnityVersionControlLocksWindow.h"
 
 /**
@@ -44,6 +45,11 @@ public:
 		return UnityVersionControlBranchesWindow;
 	}
 
+	FUnityVersionControlChangesetsWindow& GetChangesetsWindow()
+	{
+		return UnityVersionControlChangesetsWindow;
+	}
+
 	FUnityVersionControlLocksWindow& GetLocksWindow()
 	{
 		return UnityVersionControlLocksWindow;
@@ -75,6 +81,7 @@ private:
 
 	/** Dockable windows adding advanced features to the plugin */
 	FUnityVersionControlBranchesWindow UnityVersionControlBranchesWindow;
+	FUnityVersionControlChangesetsWindow UnityVersionControlChangesetsWindow;
 	FUnityVersionControlLocksWindow UnityVersionControlLocksWindow;
 
 	/** Logic to create a new workspace */

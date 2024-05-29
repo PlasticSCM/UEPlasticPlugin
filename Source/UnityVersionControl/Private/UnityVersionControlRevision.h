@@ -84,3 +84,6 @@ public:
 
 /** History composed of the last 100 revisions of the file */
 typedef TArray<TSharedRef<FUnityVersionControlRevision, ESPMode::ThreadSafe>>	TUnityVersionControlHistory;
+
+typedef TSharedPtr<FUnityVersionControlRevision, ESPMode::ThreadSafe> FUnityVersionControlRevisionPtr;
+typedef TSharedRef<FUnityVersionControlRevision, ESPMode::ThreadSafe> FUnityVersionControlRevisionRef;

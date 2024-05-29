@@ -14,7 +14,9 @@ class FUnityVersionControlProvider;
 class FUnityVersionControlState;
 struct FSoftwareVersion;
 typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
+typedef TSharedRef<class FUnityVersionControlChangeset, ESPMode::ThreadSafe> FUnityVersionControlChangesetRef;
 typedef TSharedRef<class FUnityVersionControlLock, ESPMode::ThreadSafe> FUnityVersionControlLockRef;
+typedef TSharedRef<class FUnityVersionControlState, ESPMode::ThreadSafe> FUnityVersionControlStateRef;
 
 enum class EWorkspaceState;
 
@@ -51,9 +53,33 @@ bool RunCommand(const FString& InCommand, const TArray<FString>& InParameters, c
 FString FindPlasticBinaryPath();
 
 /**
- * Find the path to the Desktop Application: uses the registry on Windows.
+ * Open the Desktop Application.
+ *
+ * @param	bInBranchExplorer	Should it open the Branch Explorer instead of the Workspace Explorer (false by default)?
  */
-FString FindDesktopApplicationPath();
+bool OpenDesktopApplication(const bool bInBranchExplorer = false);
+
+/**
+ * Open the Desktop Application for diffing a Changeset.
+ *
+ * @param	InChangesetId		Changeset to diff
+ */
+bool OpenDesktopApplicationForDiff(const int32 InChangesetId);
+
+/**
+ * Open the Desktop Application for diffing a couple of Changesets.
+ *
+ * @param	InChangesetIdSrc	Source (Left) Changeset to diff
+ * @param	InChangesetIdDst	Destination (Right) Changeset to diff
+ */
+bool OpenDesktopApplicationForDiff(const int32 InChangesetIdSrc, const int32 InChangesetIdDst);
+
+/**
+ * Open the Desktop Application for diffing a whole Branch.
+ *
+ * @param	InBranchName		Name of the Branch to diff
+ */
+bool OpenDesktopApplicationForDiff(const FString& InBranchName);
 
 /**
  * Open the Unity Cloud Dashboard on the page to show and manage Lock Rules.
@@ -120,23 +146,34 @@ bool GetWorkspaceName(const FString& InWorkspaceRoot, FString& OutWorkspaceName,
 /**
  * Get workspace info: the current branch, repository name, and server URL
  *
+ * @param	OutWorkspaceSelector	Name of the current branch, changeset or label depending on the workspace selector
  * @param	OutBranchName		Name of the current branch
  * @param	OutRepositoryName	Name of the repository of the current workspace
  * @param	OutServerUrl		URL/Port of the server of the repository
  * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
  */
-bool GetWorkspaceInfo(FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl, TArray<FString>& OutErrorMessages);
+bool GetWorkspaceInfo(FString& OutWorkspaceSelector, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl, TArray<FString>& OutErrorMessages);
+
+
+/**
+ * Get the current changeset number from the workspace (-1 for a partial workspace)
+ *
+ * @param	OutChangesetNumber	Current changeset number
+ * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
+ */
+bool GetChangesetNumber(int32& OutChangesetNumber, TArray<FString>& OutErrorMessages);
 
 /**
  * Get workspace info and check the connection to the server
  *
- * @param	OutBranchName		Name of the current branch
- * @param	OutRepositoryName	Name of the repository of the current workspace
- * @param	OutServerUrl		URL/Port of the server of the repository
- * @param	OutInfoMessages		Result of the connection test
- * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
+ * @param	OutWorkspaceSelector	Name of the current branch, changeset or label depending on the workspace selector
+ * @param	OutBranchName			Name of the current branch when available
+ * @param	OutRepositoryName		Name of the repository of the current workspace
+ * @param	OutServerUrl			URL/Port of the server of the repository
+ * @param	OutInfoMessages			Result of the connection test
+ * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
  */
-bool RunCheckConnection(FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl, TArray<FString>& OutInfoMessages, TArray<FString>& OutErrorMessages);
+bool RunCheckConnection(FString& OutWorkspaceSelector, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl, TArray<FString>& OutInfoMessages, TArray<FString>& OutErrorMessages);
 
 /**
  * Use the Project Settings to replace Unity Version Control full username/e-mail by a shorter version for display.
@@ -195,10 +232,9 @@ enum class EStatusSearchType
  * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
  * @param	OutStates			States of the files
  * @param	OutChangeset		The current Changeset Number
- * @param	OutBranchName		Name of the current checked-out branch
  * @returns true if the command succeeded and returned no errors
  */
-bool RunUpdateStatus(const TArray<FString>& InFiles, const EStatusSearchType InSearchType, const bool bInUpdateHistory, TArray<FString>& OutErrorMessages, TArray<FUnityVersionControlState>& OutStates, int32& OutChangeset, FString& OutBranchName);
+bool RunUpdateStatus(const TArray<FString>& InFiles, const EStatusSearchType InSearchType, const bool bInUpdateHistory, TArray<FString>& OutErrorMessages, TArray<FUnityVersionControlState>& OutStates, int32& OutChangeset);
 
 /**
  * Run a Plastic "cat" command to dump the binary content of a revision into a file.
@@ -223,10 +259,11 @@ bool RunGetHistory(const bool bInUpdateHistory, TArray<FUnityVersionControlState
  *
  * @param	InFiles					The files or paths to sync
  * @param	bInIsPartialWorkspace	Whether running on a partial/gluon or regular/full workspace
+ * @param	InChangesetId			The optional changeset to sync to (leave empty to sync to the latest in the branch)
  * @param	OutUpdatedFiles			The files that where updated
  * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
  */
-bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages);
+bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace, const FString& InChangesetId, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages);
 
 #if ENGINE_MAJOR_VERSION == 5
 
@@ -268,6 +305,24 @@ void AddShelvedFileToChangelist(FUnityVersionControlChangelistState& InOutChange
 #endif
 
 /**
+ * Run find "changesets where date >= 'YYYY-MM-DD'" and parse the results.
+ * @param	InFromDate				The date to search from
+ * @param	OutChangesets			The list of changesets, without their files
+ * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
+ *
+ * @see RunGetChangesetFiles() below used to populated a specific changeset with its list of files
+ */
+bool RunGetChangesets(const FDateTime& InFromDate, TArray<FUnityVersionControlChangesetRef>& OutChangesets, TArray<FString>& OutErrorMessages);
+
+/**
+ * Run "log cs:<ChangesetId> --xml" and parse the results to populate the files from the specified changeset.
+ * @param	InChangeset				The changeset to get the files changed
+ * @param	OutFiles				The files changed in the specified changeset
+ * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
+ */
+bool RunGetChangesetFiles(const FUnityVersionControlChangesetRef& InChangeset, TArray<FUnityVersionControlStateRef>& OutFiles, TArray<FString>& OutErrorMessages);
+
+/**
  * Run find "branches where date >= 'YYYY-MM-DD' or changesets >= 'YYYY-MM-DD'" and parse the results.
  * @param	InFromDate				The date to search from
  * @param	OutBranches				The list of branches
@@ -277,12 +332,13 @@ bool RunGetBranches(const FDateTime& InFromDate, TArray<FUnityVersionControlBran
 
 /**
  * Run switch br:/name and parse the results.
- * @param	InBranchName			The name of the branch to switch the workspace to
+ * @param	InBranchName			The name of the branch to switch the workspace to (optional, only used if no InChangesetId)
+ * @param	InChangesetId			The name of the changeset to switch the workspace to (optional, overrides InBranchName if set)
  * @param	bInIsPartialWorkspace	Whether running on a partial/gluon or regular/full workspace
  * @param	OutUpdatedFiles			The files that where updated
  * @param	OutErrorMessages		Any errors (from StdErr) as an array per-line
  */
-bool RunSwitchToBranch(const FString& InBranchName, const bool bInIsPartialWorkspace, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages);
+bool RunSwitch(const FString& InBranchName, const int32 InChangesetId, const bool bInIsPartialWorkspace, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages);
 
 /**
  * Run merge br:/name and parse the results.

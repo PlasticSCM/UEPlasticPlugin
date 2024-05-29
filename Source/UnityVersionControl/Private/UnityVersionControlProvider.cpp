@@ -84,7 +84,7 @@ void FUnityVersionControlProvider::Init(bool bForceConnection)
 		TArray<FString> InfoMessages, ErrorMessages;
 		TArray<FString> Parameters;
 		// Execute a 'checkconnection' command to set bServerAvailable based on the connectivity of the server
-		bServerAvailable = UnityVersionControlUtils::RunCheckConnection(BranchName, RepositoryName, ServerUrl, InfoMessages, ErrorMessages);
+		bServerAvailable = UnityVersionControlUtils::RunCheckConnection(WorkspaceSelector, BranchName, RepositoryName, ServerUrl, InfoMessages, ErrorMessages);
 		if (!bServerAvailable)
 		{
 			FMessageLog SourceControlLog("SourceControl");
@@ -142,7 +142,7 @@ void FUnityVersionControlProvider::CheckPlasticAvailability()
 		if (bWorkspaceFound)
 		{
 			TArray<FString> ErrorMessages;
-			UnityVersionControlUtils::GetWorkspaceInfo(BranchName, RepositoryName, ServerUrl, ErrorMessages);
+			UnityVersionControlUtils::GetWorkspaceInfo(WorkspaceSelector, BranchName, RepositoryName, ServerUrl, ErrorMessages);
 			UserName = UnityVersionControlUtils::GetProfileUserName(ServerUrl);
 		}
 		else
@@ -239,7 +239,7 @@ FText FUnityVersionControlProvider::GetStatusText() const
 	Args.Add(TEXT("PluginVersion"), FText::FromString(PluginVersion));
 	Args.Add(TEXT("WorkspacePath"), FText::FromString(PathToWorkspaceRoot));
 	Args.Add(TEXT("WorkspaceName"), FText::FromString(WorkspaceName));
-	Args.Add(TEXT("BranchName"), FText::FromString(BranchName));
+	Args.Add(TEXT("WorkspaceSelector"), FText::FromString(WorkspaceSelector));
 	Args.Add(TEXT("RepositoryName"), FText::FromString(RepositoryName));
 	Args.Add(TEXT("ServerUrl"), FText::FromString(ServerUrl));
 	// Detect special case for a partial checkout (CS:-1 in Gluon mode)!
@@ -273,7 +273,7 @@ FText FUnityVersionControlProvider::GetStatusText() const
 	}
 	Args.Add(TEXT("ErrorText"), FormattedError);
 
-	return FText::Format(LOCTEXT("PlasticStatusText", "{ErrorText}Unity Version Control (formerly Plastic SCM) {PlasticScmVersion}\t(plugin v{PluginVersion})\nWorkspace: {WorkspaceName}  ({WorkspacePath})\nBranch: {BranchName}@{RepositoryName}@{ServerUrl}\nChangeset: {ChangesetNumber}\nUser: '{UserName}'  {DisplayName}"), Args);
+	return FText::Format(LOCTEXT("PlasticStatusText", "{ErrorText}Unity Version Control (formerly Plastic SCM) {PlasticScmVersion}\t(plugin v{PluginVersion})\nWorkspace: {WorkspaceName}  ({WorkspacePath})\n{WorkspaceSelector}@{RepositoryName}@{ServerUrl}\nChangeset: {ChangesetNumber}\nUser: '{UserName}'  {DisplayName}"), Args);
 }
 
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
@@ -288,8 +288,8 @@ TMap<ISourceControlProvider::EStatus, FString> FUnityVersionControlProvider::Get
 	Result.Add(EStatus::PluginVersion, PluginVersion);
 	Result.Add(EStatus::WorkspacePath, PathToWorkspaceRoot);
 	Result.Add(EStatus::Workspace, WorkspaceName);
-	Result.Add(EStatus::Branch, BranchName);
-	if (IsPartialWorkspace())
+	Result.Add(EStatus::Branch, WorkspaceSelector);
+	if (!IsPartialWorkspace())
 	{
 		Result.Add(EStatus::Changeset, FString::Printf(TEXT("%d"), ChangesetNumber));
 	}
@@ -674,6 +674,10 @@ void FUnityVersionControlProvider::UpdateWorkspaceStatus(const class FUnityVersi
 	if (!InCommand.BranchName.IsEmpty())
 	{
 		BranchName = InCommand.BranchName;
+	}
+	if (!InCommand.WorkspaceSelector.IsEmpty())
+	{
+		WorkspaceSelector = InCommand.WorkspaceSelector;
 	}
 }
 

@@ -55,6 +55,7 @@ private:
 	void OnColumnSortModeChanged(const EColumnSortPriority::Type InSortPriority, const FName& InColumnId, const EColumnSortMode::Type InSortMode);
 
 	void SortBranchView();
+
 	TArray<FString> GetSelectedBranches();
 
 	TSharedPtr<SWidget> OnOpenContextMenu();
@@ -84,16 +85,24 @@ private:
 	void OnDeleteBranchesOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult);
 	void OnSourceControlProviderChanged(ISourceControlProvider& OldProvider, ISourceControlProvider& NewProvider);
 
+	/** Delegate handler for when source control state changes */
+	void HandleSourceControlStateChanged();
+
 	SListView<FUnityVersionControlBranchRef>* GetListView() const
 	{
 		return BranchesListView.Get();
 	}
 
+	void SwitchToBranchWithConfirmation(const FString& InSelectedBranch);
+
+	/** Double click to switch to the branch */
+	void OnItemDoubleClicked(FUnityVersionControlBranchRef InBranch);
+
 	/** Interpret F5, Enter and Delete keys */
 	virtual FReply OnKeyDown(const FGeometry& MyGeometry, const FKeyEvent& InKeyEvent) override;
 
 private:
-	TSharedPtr<SSearchBox> FileSearchBox;
+	TSharedPtr<SSearchBox> BranchSearchBox;
 
 	FName PrimarySortedColumn;
 	FName SecondarySortedColumn;
@@ -109,7 +118,7 @@ private:
 	bool bIsRefreshing = false;
 	double RefreshStatusStartSecs;
 
-	FString CurrentBranchName;
+	FString WorkspaceSelector;
 
 	/** Ongoing notification for a long-running asynchronous source control operation, if any */
 	FNotification Notification;
@@ -122,6 +131,9 @@ private:
 
 	TArray<FUnityVersionControlBranchRef> SourceControlBranches; // Full list from source (filtered by date)
 	TArray<FUnityVersionControlBranchRef> BranchRows; // Filtered list to display based on the search text filter
+
+	/** Delegate handle for the HandleSourceControlStateChanged function callback */
+	FDelegateHandle SourceControlStateChangedDelegateHandle;
 
 	/** The dialog Window that opens when the user click on any context menu entry */
 	TSharedPtr<SWindow> DialogWindowPtr;

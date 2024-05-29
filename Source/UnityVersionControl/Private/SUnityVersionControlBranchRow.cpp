@@ -95,6 +95,7 @@ TSharedRef<SWidget> SUnityVersionControlBranchRow::GenerateWidgetForColumn(const
 	}
 	else if (InColumnId == UnityVersionControlBranchesListViewColumn::Comment::Id())
 	{
+		// Make each comment fit on a single line to preserve the table layout
 		FString CommentOnOneLine = BranchToVisualize->Comment;
 		CommentOnOneLine.ReplaceCharInline(TEXT('\n'), TEXT(' '), ESearchCase::CaseSensitive);
 

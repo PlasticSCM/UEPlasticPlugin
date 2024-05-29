@@ -20,13 +20,16 @@
 
 class FUnityVersionControlProvider;
 typedef TSharedRef<class FUnityVersionControlBranch, ESPMode::ThreadSafe> FUnityVersionControlBranchRef;
+typedef TSharedRef<class FUnityVersionControlChangeset, ESPMode::ThreadSafe> FUnityVersionControlChangesetRef;
+typedef TSharedPtr<class FUnityVersionControlChangeset, ESPMode::ThreadSafe> FUnityVersionControlChangesetPtr;
 typedef TSharedRef<class FUnityVersionControlLock, ESPMode::ThreadSafe> FUnityVersionControlLockRef;
 
 
 /**
  * Internal operation used to revert checked-out unchanged files
+ *
+ * NOTE: added to Engine in Unreal Engine 5 for changelists
 */
-// NOTE: added to Engine in Unreal Engine 5 for changelists
 class FPlasticRevertUnchanged final : public FSourceControlOperationBase
 {
 public:
@@ -39,12 +42,16 @@ public:
 
 /**
  * Internal operation used to sync all files in the workspace
+ *
+ * NOTE: override the standard "Sync" operation to provide a list of updated files and a custom progress string
 */
 class FPlasticSyncAll final : public FSync
 {
 public:
 	// ISourceControlOperation interface
 	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
 
 	/** List of files updated by the operation */
 	TArray<FString> UpdatedFiles;
@@ -64,6 +71,25 @@ public:
 
 	/** List of files updated by the operation */
 	TArray<FString> UpdatedFiles;
+};
+
+
+/**
+ * Internal operation used to revert files to a previous revision
+*/
+class FPlasticRevertToRevision final : public FSourceControlOperationBase
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	/** List of files updated by the operation */
+	TArray<FString> UpdatedFiles;
+
+	// Changeset to revert the files to
+	int32 ChangesetId = ISourceControlState::INVALID_REVISION;
 };
 
 
@@ -144,7 +170,7 @@ public:
 
 	virtual FText GetInProgressString() const override;
 
-	// Limit the list of branches to ones created from this date
+	// Limit the list of branches to ones created from this date (optional, filtering enabled by default)
 	FDateTime FromDate;
 
 	// List of branches found
@@ -153,9 +179,9 @@ public:
 
 
 /**
- * Internal operation used to switch the workspace to another branch
+ * Internal operation used to switch the workspace to a branch or a changeset
 */
-class FPlasticSwitchToBranch final : public FSourceControlOperationBase
+class FPlasticSwitch final : public FSourceControlOperationBase
 {
 public:
 	// ISourceControlOperation interface
@@ -163,8 +189,11 @@ public:
 
 	virtual FText GetInProgressString() const override;
 
-	// Branch to switch the workspace to
+	// Branch to switch the workspace to (optional, only apply if ChangesetId is not set)
 	FString BranchName;
+
+	// Changeset to switch the workspace to (optional, overrides the BranchName if set)
+	int32 ChangesetId = ISourceControlState::INVALID_REVISION;
 
 	/** List of files updated by the operation */
 	TArray<FString> UpdatedFiles;
@@ -234,6 +263,44 @@ public:
 	virtual FText GetInProgressString() const override;
 
 	TArray<FString> BranchNames;
+};
+
+
+/**
+ * Internal operation to list changesets, aka "cm find changesets"
+*/
+class FPlasticGetChangesets final : public FSourceControlOperationBase
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	// Limit the list of changesets to ones created from this date (optional, filtering enabled by default)
+	FDateTime FromDate;
+
+	// List of changesets found
+	TArray<FUnityVersionControlChangesetRef> Changesets;
+};
+
+
+/**
+ * Internal operation to list files in a changeset, using "cm log cs:<ChangesetId>"
+*/
+class FPlasticGetChangesetFiles final : public FSourceControlOperationBase
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	// Changeset to list files from
+	FUnityVersionControlChangesetPtr Changeset;
+
+	// List of files changed in the changeset
+	TArray<FUnityVersionControlStateRef> Files;
 };
 
 
@@ -410,6 +477,24 @@ public:
 	TArray<FUnityVersionControlState> States;
 };
 
+/** Revert file(s) to selected revision. */
+class FPlasticRevertToRevisionWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticRevertToRevisionWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticRevertToRevisionWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+
+public:
+	/** Temporary states for results */
+	TArray<FUnityVersionControlState> States;
+};
+
 /** Create a new Workspace and a new Repository */
 class FPlasticMakeWorkspaceWorker final : public IUnityVersionControlWorker
 {
@@ -454,9 +539,6 @@ public:
 	virtual FName GetName() const override;
 	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
 	virtual bool UpdateStates() override;
-
-	// Current branch the workspace is on (at the end of the operation)
-	FString CurrentBranchName;
 };
 
 /** release or remove Lock(s) on file(s). */
@@ -489,19 +571,16 @@ public:
 	virtual FName GetName() const override;
 	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
 	virtual bool UpdateStates() override;
-
-	// Current branch the workspace is on (at the end of the operation)
-	FString CurrentBranchName;
 };
 
 /** Switch workspace to another branch. */
-class FPlasticSwitchToBranchWorker final : public IUnityVersionControlWorker
+class FPlasticSwitchWorker final : public IUnityVersionControlWorker
 {
 public:
-	explicit FPlasticSwitchToBranchWorker(FUnityVersionControlProvider& InSourceControlProvider)
+	explicit FPlasticSwitchWorker(FUnityVersionControlProvider& InSourceControlProvider)
 		: IUnityVersionControlWorker(InSourceControlProvider)
 	{}
-	virtual ~FPlasticSwitchToBranchWorker() = default;
+	virtual ~FPlasticSwitchWorker() = default;
 	// IUnityVersionControlWorker interface
 	virtual FName GetName() const override;
 	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
@@ -566,6 +645,37 @@ public:
 		: IUnityVersionControlWorker(InSourceControlProvider)
 	{}
 	virtual ~FPlasticDeleteBranchesWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+};
+
+/** list changesets. */
+class FPlasticGetChangesetsWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticGetChangesetsWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticGetChangesetsWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+
+	// Current changeset the workspace is on (at the end of the operation)
+	int32 CurrentChangesetId;
+};
+
+/** list files in changeset. */
+class FPlasticGetChangesetFilesWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticGetChangesetFilesWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticGetChangesetFilesWorker() = default;
 	// IUnityVersionControlWorker interface
 	virtual FName GetName() const override;
 	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;

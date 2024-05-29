@@ -2,6 +2,8 @@
 
 #include "SUnityVersionControlStatusBar.h"
 
+#if ENGINE_MAJOR_VERSION == 5
+
 #include "UnityVersionControlModule.h"
 
 #include "Runtime/Launch/Resources/Version.h"
@@ -65,7 +67,7 @@ void SUnityVersionControlStatusBar::Construct(const FArguments& InArgs)
 
 FText SUnityVersionControlStatusBar::GetStatusBarText() const
 {;
-	return FText::FromString(FUnityVersionControlModule::Get().GetProvider().GetBranchName());
+	return FText::FromString(FUnityVersionControlModule::Get().GetProvider().GetWorkspaceSelector());
 }
 
 FReply SUnityVersionControlStatusBar::OnClicked()
@@ -76,3 +78,5 @@ FReply SUnityVersionControlStatusBar::OnClicked()
 }
 
 #undef LOCTEXT_NAMESPACE
+
+#endif // ENGINE_MAJOR_VERSION == 5

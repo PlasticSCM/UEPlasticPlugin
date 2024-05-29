@@ -4,8 +4,9 @@
 
 #include "Async/Async.h"
 #include "Editor.h"
-#include "ISourceControlModule.h" // LogSourceControl
 #include "FileHelpers.h"
+#include "ISourceControlModule.h" // LogSourceControl
+#include "Misc/Paths.h"
 #include "PackageTools.h"
 #include "UObject/Linker.h"
 
@@ -148,7 +149,7 @@ static TArray<UPackage*> ListPackagesToReload(const TArray<FString>& InFiles)
 		const FString CurrentMapFileAbsolute = FPaths::ConvertRelativePathToFull(CurrentMapPackage->GetLoadedPath().GetLocalFullPath());
 		const bool bHasCurrentMapBeenUpdated = InFiles.FindByPredicate(
 			[&CurrentMapFileAbsolute](const FString& InFilePath) { return InFilePath.Equals(CurrentMapFileAbsolute, ESearchCase::IgnoreCase); }
-		) != nullptr;// NOLINT(whitespace/parens) "Closing ) should be moved to the previous line" doesn't work well when used with lambda functions
+		) != nullptr; // NOLINT(whitespace/parens) "Closing ) should be moved to the previous line" doesn't work well when used with lambda functions
 
 		if (!bHasCurrentMapBeenUpdated)
 		{

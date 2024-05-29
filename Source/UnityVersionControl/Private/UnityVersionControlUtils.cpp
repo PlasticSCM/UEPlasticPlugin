@@ -51,8 +51,18 @@ bool RunCommand(const FString& InCommand, const TArray<FString>& InParameters, c
 
 	const bool bResult = UnityVersionControlShell::RunCommand(InCommand, InParameters, InFiles, Results, Errors);
 
-	Results.ParseIntoArray(OutResults, UnityVersionControlShell::pchDelim, true);
-	Errors.ParseIntoArray(OutErrorMessages, UnityVersionControlShell::pchDelim, true);
+	if (!Results.IsEmpty())
+	{
+		TArray<FString> ParsedResults;
+		Results.ParseIntoArray(OutResults, UnityVersionControlShell::pchDelim, true);
+		OutResults.Append(MoveTemp(ParsedResults));
+	}
+	if (!Errors.IsEmpty())
+	{
+		TArray<FString> ParsedErrors;
+		Errors.ParseIntoArray(OutErrorMessages, UnityVersionControlShell::pchDelim, true);
+		OutErrorMessages.Append(MoveTemp(ParsedErrors));
+	}
 
 	return bResult;
 }

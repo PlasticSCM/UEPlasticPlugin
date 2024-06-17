@@ -112,10 +112,9 @@ static bool _StartBackgroundPlasticShell(const FString& InPathToPlasticBinary, c
 	verify(FPlatformProcess::CreatePipe(ShellInputPipeRead, ShellInputPipeWrite, true));	// For writing commands to cm shell child process
 #endif
 
-
-#if PLATFORM_WINDOWS
+#if PLATFORM_WINDOWS or PLATFORM_MAC
 	ShellProcessHandle = FPlatformProcess::CreateProc(*InPathToPlasticBinary, *FullCommand, bLaunchDetached, bLaunchHidden, bLaunchReallyHidden, nullptr, 0, *InWorkingDirectory, ShellOutputPipeWrite, ShellInputPipeRead);
-#else // PLATFORM_MAC or PLATFORM_LINUX
+#else // PLATFORM_LINUX
 	// Update working directory
 	char OriginalWorkingDirectory[PATH_MAX];
 	getcwd(OriginalWorkingDirectory, PATH_MAX);
@@ -129,8 +128,9 @@ static bool _StartBackgroundPlasticShell(const FString& InPathToPlasticBinary, c
 
 	if (!ShellProcessHandle.IsValid())
 	{
-		UE_LOG(LogSourceControl, Warning, TEXT("Failed to launch 'cm shell'")); // not a bug, just no Unity Version Control cli found
+		UE_LOG(LogSourceControl, Warning, TEXT("Failed to launch '%s %s'"), *InPathToPlasticBinary, *FullCommand); // not a bug, just no Unity Version Control cli found
 		_CleanupBackgroundCommandLineShell();
+		return false;
 	}
 	else
 	{
@@ -155,11 +155,13 @@ static void _ExitBackgroundCommandLineShell(const bool bInForceExit = false)
 		{
 			if (bInForceExit)
 			{
+				UE_LOG(LogSourceControl, Verbose, TEXT("_ExitBackgroundCommandLineShell: TerminateProc"));
 				FPlatformProcess::TerminateProc(ShellProcessHandle);
 			}
 			else
 			{
 				// Tell the 'cm shell' to exit
+				UE_LOG(LogSourceControl, Verbose, TEXT("_ExitBackgroundCommandLineShell: exit..."));
 				FPlatformProcess::WritePipe(ShellInputPipeWrite, TEXT("exit"));
 				// And wait up to one second for its termination
 				const double Timeout = 1.0;
@@ -168,13 +170,17 @@ static void _ExitBackgroundCommandLineShell(const bool bInForceExit = false)
 				{
 					if ((FPlatformTime::Seconds() - StartTimestamp) > Timeout)
 					{
-						UE_LOG(LogSourceControl, Warning, TEXT("ExitBackgroundCommandLineShell: cm shell didn't stop gracefully in %lfs."), Timeout);
+						UE_LOG(LogSourceControl, Warning, TEXT("_ExitBackgroundCommandLineShell: cm shell didn't stop gracefully in %lfs."), Timeout);
 						FPlatformProcess::TerminateProc(ShellProcessHandle);
 						break;
 					}
 					FPlatformProcess::Sleep(0.01f);
 				}
 			}
+		}
+		else
+		{
+			UE_LOG(LogSourceControl, Verbose, TEXT("_ExitBackgroundCommandLineShell: 'cm shell' already stopped"));
 		}
 		FPlatformProcess::CloseProc(ShellProcessHandle);
 		_CleanupBackgroundCommandLineShell();

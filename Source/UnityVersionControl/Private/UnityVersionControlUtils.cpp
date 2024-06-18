@@ -92,12 +92,12 @@ static FString FindDesktopApplicationPath()
 	const TCHAR* GluonExe = TEXT("client/gluon.exe");
 	DesktopAppPath = FPaths::Combine(InstallLocation, FUnityVersionControlModule::Get().GetProvider().IsPartialWorkspace() ? GluonExe : PlasticExe);
 #elif PLATFORM_MAC
-	const TCHAR* PlasticExe = "/Applications/PlasticSCM.app/Contents/MacOS/macplasticx";
-	const TCHAR* GluonExe = "/Applications/Gluon.app/Contents/MacOS/macgluonx";
+	const TCHAR* PlasticExe = TEXT("/Applications/PlasticSCM.app/Contents/MacOS/macplasticx");
+	const TCHAR* GluonExe = TEXT("/Applications/Gluon.app/Contents/MacOS/macgluonx");
 	DesktopAppPath = FUnityVersionControlModule::Get().GetProvider().IsPartialWorkspace() ? GluonExe : PlasticExe);
 #elif PLATFORM_LINUX
-	const TCHAR* PlasticExe = "/usr/bin/plasticgui ";
-	const TCHAR* GluonExe = "/usr/bin/gluon";
+	const TCHAR* PlasticExe = TEXT("/usr/bin/plasticgui");
+	const TCHAR* GluonExe = TEXT("/usr/bin/gluon");
 	DesktopAppPath = FUnityVersionControlModule::Get().GetProvider().IsPartialWorkspace() ? GluonExe : PlasticExe);
 #endif
 

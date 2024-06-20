@@ -38,7 +38,7 @@ private:
 	mutable FCriticalSection CriticalSection;
 
 	/** Plastic binary path */
-	FString BinaryPath = TEXT("cm");
+	FString BinaryPath;
 
 	/** Run an asynchronous "Update Status" at Editor Startup (default is no).
 	 * This does not work well with very big projects where this operation could take dozens of seconds

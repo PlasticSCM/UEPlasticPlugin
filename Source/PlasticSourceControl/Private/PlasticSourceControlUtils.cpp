@@ -71,6 +71,8 @@ FString FindPlasticBinaryPath()
 {
 #if PLATFORM_WINDOWS
 	return FString(TEXT("cm"));
+#elif PLATFORM_MAC
+	return FString(TEXT("/usr/local/bin/cm"));
 #else
 	return FString(TEXT("/usr/bin/cm"));
 #endif

@@ -128,8 +128,9 @@ static bool _StartBackgroundPlasticShell(const FString& InPathToPlasticBinary, c
 
 	if (!ShellProcessHandle.IsValid())
 	{
-		UE_LOG(LogSourceControl, Warning, TEXT("Failed to launch 'cm shell'")); // not a bug, just no Unity Version Control cli found
+		UE_LOG(LogSourceControl, Warning, TEXT("Failed to launch '%s %s'"), *InPathToPlasticBinary, *FullCommand); // not a bug, just no Unity Version Control cli found
 		_CleanupBackgroundCommandLineShell();
+		return false;
 	}
 	else
 	{

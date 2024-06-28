@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Unity Technologies
+// Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "PlasticSourceControlShell.h"
 

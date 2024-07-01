@@ -21,16 +21,9 @@
 #include "ToolMenus.h"
 #include "ToolMenuContext.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 #include "Misc/ComparisonUtility.h"
-#endif
 #include "Misc/MessageDialog.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 #include "Framework/Application/SlateApplication.h"
 #include "Framework/Docking/TabManager.h"
 #include "Widgets/Images/SImage.h"
@@ -70,11 +63,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 		.AutoHeight()
 		[
 			SNew(SBorder)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 			.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
-#else
-			.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
-#endif
 			.Padding(4.0f)
 			[
 				SNew(SHorizontalBox)
@@ -127,11 +116,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 					SNew(SButton)
 					.ContentPadding(FMargin(6.0f, 0.0f))
 					.ToolTipText(LOCTEXT("PlasticChangesetsWindowTooltip", "Open the Changesets window."))
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-#elif ENGINE_MAJOR_VERSION == 5
-					.ButtonStyle(FEditorStyle::Get(), "SimpleButton")
-#endif
 					.OnClicked_Lambda([]()
 						{
 							FPlasticSourceControlModule::Get().GetChangesetsWindow().OpenTab();
@@ -145,11 +130,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 						.HAlign(HAlign_Center)
 						[
 							SNew(SImage)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 							.Image(FAppStyle::GetBrush("SourceControl.Actions.History"))
-#else
-							.Image(FEditorStyle::GetBrush("SourceControl.Actions.History"))
-#endif
 						]
 						+SHorizontalBox::Slot()
 						.AutoWidth()
@@ -157,11 +138,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 						.Padding(5.0f, 0.0f, 0.0f, 0.0f)
 						[
 							SNew(STextBlock)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 							.TextStyle(&FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
-#else
-							.TextStyle(&FEditorStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
-#endif
 							.Text(LOCTEXT("PlasticChangesetsWindow", "Changesets"))
 						]
 					]
@@ -175,11 +152,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 					SNew(SButton)
 					.ContentPadding(FMargin(6.0f, 0.0f))
 					.ToolTipText(LOCTEXT("PlasticBranchExplorerTooltip", "Open the Branch Explorer of the Desktop Application for the current workspace."))
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-#elif ENGINE_MAJOR_VERSION == 5
-					.ButtonStyle(FEditorStyle::Get(), "SimpleButton")
-#endif
 					.OnClicked_Lambda([]()
 						{
 							PlasticSourceControlUtils::OpenDesktopApplication(true);
@@ -193,11 +166,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 						.HAlign(HAlign_Center)
 						[
 							SNew(SImage)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 							.Image(FAppStyle::GetBrush("SourceControl.Branch"))
-#else
-							.Image(FEditorStyle::GetBrush("SourceControl.Branch"))
-#endif
 						]
 						+SHorizontalBox::Slot()
 						.AutoWidth()
@@ -205,11 +174,7 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 						.Padding(5.0f, 0.0f, 0.0f, 0.0f)
 						[
 							SNew(STextBlock)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 							.TextStyle(&FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
-#else
-							.TextStyle(&FEditorStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
-#endif
 							.Text(LOCTEXT("OpenBranchExplorer", "Branch Explorer"))
 						]
 					]
@@ -263,22 +228,14 @@ void SPlasticSourceControlBranchesWidget::Construct(const FArguments& InArgs)
 
 TSharedRef<SWidget> SPlasticSourceControlBranchesWidget::CreateToolBar()
 {
-#if ENGINE_MAJOR_VERSION >= 5
 	FSlimHorizontalToolBarBuilder ToolBarBuilder(nullptr, FMultiBoxCustomization::None);
-#else
-	FToolBarBuilder ToolBarBuilder(nullptr, FMultiBoxCustomization::None);
-#endif
 
 	ToolBarBuilder.AddToolBarButton(
 		FUIAction(FExecuteAction::CreateLambda([this]() { bShouldRefresh = true; })),
 		NAME_None,
 		LOCTEXT("SourceControl_RefreshButton", "Refresh"),
 		LOCTEXT("SourceControl_RefreshButton_Tooltip", "Refreshes branches from revision control provider."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Refresh"));
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Refresh"));
-#endif
 
 	return ToolBarBuilder.MakeWidget();
 }
@@ -527,20 +484,12 @@ void SPlasticSourceControlBranchesWidget::SortBranchView()
 
 	auto CompareNames = [](const FPlasticSourceControlBranch* Lhs, const FPlasticSourceControlBranch* Rhs)
 	{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		return UE::ComparisonUtility::CompareNaturalOrder(*Lhs->Name, *Rhs->Name);
-#else
-		return FCString::Stricmp(*Lhs->Name, *Rhs->Name);
-#endif
 	};
 
 	auto CompareRepository = [](const FPlasticSourceControlBranch* Lhs, const FPlasticSourceControlBranch* Rhs)
 	{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		return UE::ComparisonUtility::CompareNaturalOrder(*Lhs->Repository, *Rhs->Repository);
-#else
-		return FCString::Stricmp(*Lhs->Repository, *Rhs->Repository);
-#endif
 	};
 
 	auto CompareCreatedBy = [](const FPlasticSourceControlBranch* Lhs, const FPlasticSourceControlBranch* Rhs)
@@ -881,13 +830,9 @@ void SPlasticSourceControlBranchesWidget::OnMergeBranchClicked(FString InBranchN
 {
 	const FText MergeBranchQuestion = FText::Format(LOCTEXT("MergeBranchDialog", "Merge branch {0} into the current branch {1}?"), FText::FromString(InBranchName), FText::FromString(WorkspaceSelector));
 	const EAppReturnType::Type Choice = FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		EAppMsgCategory::Info,
-#endif
 		EAppMsgType::YesNo, MergeBranchQuestion
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		, LOCTEXT("MergeBranchTitle", "Merge Branch?")
-#endif
 	);
 	if (Choice == EAppReturnType::Yes)
 	{
@@ -1209,13 +1154,9 @@ void SPlasticSourceControlBranchesWidget::SwitchToBranchWithConfirmation(const F
 {
 	const FText SwitchToBranchQuestion = FText::Format(LOCTEXT("SwitchToBranchDialog", "Switch workspace to branch {0}?"), FText::FromString(InSelectedBranch));
 	const EAppReturnType::Type Choice = FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		EAppMsgCategory::Info,
-#endif
 		EAppMsgType::YesNo, SwitchToBranchQuestion
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		, LOCTEXT("SwitchToBranchTitle", "Switch Branch?")
-#endif
 	);
 	if (Choice == EAppReturnType::Yes)
 	{

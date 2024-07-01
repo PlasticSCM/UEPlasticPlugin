@@ -7,8 +7,6 @@
 
 #include "Widgets/Text/STextBlock.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-
 #define LOCTEXT_NAMESPACE "PlasticSourceControlLockWindow"
 
 FName PlasticSourceControlLocksListViewColumn::ItemId::Id() { return TEXT("ItemId"); }
@@ -69,9 +67,7 @@ TSharedRef<SWidget> SPlasticSourceControlLockRow::GenerateWidgetForColumn(const 
 			.Text(FText::FromString(LockToVisualize->Path))
 			.ToolTipText(FText::FromString(LockToVisualize->Path))
 			.Margin(FMargin(6.f, 1.f))
-#if ENGINE_MAJOR_VERSION >= 5
 			.OverflowPolicy(ETextOverflowPolicy::Ellipsis)
-#endif
 			.HighlightText(HighlightText);
 	}
 	else if (InColumnId == PlasticSourceControlLocksListViewColumn::Status::Id())

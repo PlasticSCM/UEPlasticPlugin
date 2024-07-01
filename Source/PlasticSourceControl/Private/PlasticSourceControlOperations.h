@@ -11,12 +11,8 @@
 #include "SourceControlOperationBase.h"
 #include "SourceControlOperations.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-
-#if ENGINE_MAJOR_VERSION == 5
 #include "PlasticSourceControlChangelist.h"
 #include "PlasticSourceControlChangelistState.h"
-#endif
 
 class FPlasticSourceControlProvider;
 typedef TSharedRef<class FPlasticSourceControlBranch, ESPMode::ThreadSafe> FPlasticSourceControlBranchRef;
@@ -328,9 +324,7 @@ class FPlasticCheckOutWorker final : public IPlasticSourceControlWorker
 public:
 	explicit FPlasticCheckOutWorker(FPlasticSourceControlProvider& InSourceControlProvider)
 		: IPlasticSourceControlWorker(InSourceControlProvider)
-#if ENGINE_MAJOR_VERSION == 5
 		, InChangelist(FPlasticSourceControlChangelist::DefaultChangelist) // By default, add checked out files in the default changelist.
-#endif
 	{}
 	virtual ~FPlasticCheckOutWorker() = default;
 	// IPlasticSourceControlWorker interface
@@ -342,10 +336,8 @@ public:
 	/** Temporary states for results */
 	TArray<FPlasticSourceControlState> States;
 
-#if ENGINE_MAJOR_VERSION == 5
 	/** Changelist we checked-out files to (defaults to the Default changelist) */
 	FPlasticSourceControlChangelist InChangelist;
-#endif
 };
 
 /** Check-in a set of file to the local depot. */
@@ -365,10 +357,8 @@ public:
 	/** Temporary states for results */
 	TArray<FPlasticSourceControlState> States;
 
-#if ENGINE_MAJOR_VERSION == 5
 	/** Changelist we submitted */
 	FPlasticSourceControlChangelist InChangelist;
-#endif
 };
 
 /** Add an untracked file to source control (so only a subset of the Plastic add command). */
@@ -377,9 +367,7 @@ class FPlasticMarkForAddWorker final : public IPlasticSourceControlWorker
 public:
 	explicit FPlasticMarkForAddWorker(FPlasticSourceControlProvider& InSourceControlProvider)
 		: IPlasticSourceControlWorker(InSourceControlProvider)
-#if ENGINE_MAJOR_VERSION == 5
 		, InChangelist(FPlasticSourceControlChangelist::DefaultChangelist) // By default, add new files in the default changelist.
-#endif
 	{}
 	virtual ~FPlasticMarkForAddWorker() = default;
 	// IPlasticSourceControlWorker interface
@@ -391,10 +379,8 @@ public:
 	/** Temporary states for results */
 	TArray<FPlasticSourceControlState> States;
 
-#if ENGINE_MAJOR_VERSION == 5
 	/** Changelist we added files to (defaults to the Default changelist) */
 	FPlasticSourceControlChangelist InChangelist;
-#endif
 };
 
 /** Delete a file and remove it from source control. */
@@ -403,9 +389,7 @@ class FPlasticDeleteWorker final : public IPlasticSourceControlWorker
 public:
 	explicit FPlasticDeleteWorker(FPlasticSourceControlProvider& InSourceControlProvider)
 		: IPlasticSourceControlWorker(InSourceControlProvider)
-#if ENGINE_MAJOR_VERSION == 5
 		, InChangelist(FPlasticSourceControlChangelist::DefaultChangelist) // By default, add deleted files in the default changelist.
-#endif
 	{}
 	virtual ~FPlasticDeleteWorker() = default;
 	// IPlasticSourceControlWorker interface
@@ -417,10 +401,8 @@ public:
 	/** Temporary states for results */
 	TArray<FPlasticSourceControlState> States;
 
-#if ENGINE_MAJOR_VERSION == 5
 	/** Changelist we delete files to (defaults to the Default changelist) */
 	FPlasticSourceControlChangelist InChangelist;
-#endif
 };
 
 /** Revert any change to a file to its state on the local depot. */
@@ -753,8 +735,6 @@ private:
 	TArray<FPlasticSourceControlState> States;
 };
 
-#if ENGINE_MAJOR_VERSION == 5
-
 class FPlasticGetPendingChangelistsWorker final : public IPlasticSourceControlWorker
 {
 public:
@@ -926,8 +906,6 @@ protected:
 	int32 ShelveId = ISourceControlState::INVALID_REVISION;
 };
 
-#if ENGINE_MINOR_VERSION >= 1
-
 class FPlasticGetChangelistDetailsWorker final : public IPlasticSourceControlWorker
 {
 public:
@@ -955,7 +933,3 @@ public:
 	virtual bool Execute(FPlasticSourceControlCommand& InCommand) override;
 	virtual bool UpdateStates() override;
 };
-
-#endif
-
-#endif

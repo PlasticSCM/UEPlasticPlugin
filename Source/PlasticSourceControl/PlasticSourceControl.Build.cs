@@ -9,7 +9,9 @@ public class PlasticSourceControl : ModuleRules
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
 		// Note: from UE5.4 onward, replaced by IWYUSupport = IWYUSupport.Full;
-		bEnforceIWYU = true;
+		// TODO
+		//	bEnforceIWYU = true;
+		IWYUSupport = IWYUSupport.Full;
 
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
@@ -20,10 +22,8 @@ public class PlasticSourceControl : ModuleRules
 				"Slate",
 				"SlateCore",
 				"InputCore",
-				"EditorStyle",
 				"UnrealEd",
 				"LevelEditor",
-				"DesktopPlatform",
 				"SourceControl",
 				"SourceControlWindows",
 				"XmlParser",

@@ -6,8 +6,6 @@
 
 #include "PlasticSourceControlRevision.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-
 class FPlasticSourceControlChangelistState;
 class FPlasticSourceControlCommand;
 class FPlasticSourceControlProvider;
@@ -265,8 +263,6 @@ bool RunGetHistory(const bool bInUpdateHistory, TArray<FPlasticSourceControlStat
  */
 bool RunUpdate(const TArray<FString>& InFiles, const bool bInIsPartialWorkspace, const FString& InChangesetId, TArray<FString>& OutUpdatedFiles, TArray<FString>& OutErrorMessages);
 
-#if ENGINE_MAJOR_VERSION == 5
-
 /**
  * Run a Plastic "status --changelist --xml" and parse its XML result.
  * @param	OutChangelistsStates	The list of changelists (without their files)
@@ -301,8 +297,6 @@ bool RunGetShelve(const int32 InShelveId, FString& OutComment, FDateTime& OutDat
  * @param	InMovedFrom				If moved, the original filename
 */
 void AddShelvedFileToChangelist(FPlasticSourceControlChangelistState& InOutChangelistsState, FString&& InFilename, EWorkspaceState InShelveStatus, FString&& InMovedFrom);
-
-#endif
 
 /**
  * Run find "changesets where date >= 'YYYY-MM-DD'" and parse the results.

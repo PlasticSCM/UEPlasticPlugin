@@ -17,16 +17,9 @@
 #include "ToolMenus.h"
 #include "ToolMenuContext.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 #include "Misc/ComparisonUtility.h"
-#endif
 #include "Misc/MessageDialog.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 #include "Widgets/Images/SImage.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SSearchBox.h"
@@ -57,11 +50,7 @@ void SPlasticSourceControlLocksWidget::Construct(const FArguments& InArgs)
 		.AutoHeight()
 		[
 			SNew(SBorder)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 			.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
-#else
-			.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
-#endif
 			.Padding(4.0f)
 			[
 				SNew(SHorizontalBox)
@@ -103,11 +92,7 @@ void SPlasticSourceControlLocksWidget::Construct(const FArguments& InArgs)
 					.ToolTipText(OrganizationName.IsEmpty() ?
 						LOCTEXT("PlasticLockRulesURLTooltipDisabled", "Web link to the Unity Dashboard disabled. Only available for Cloud repositories.") :
 						LOCTEXT("PlasticLockRulesURLTooltipEnabled", "Navigate to lock rules configuration page in the Unity Dashboard."))
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-#elif ENGINE_MAJOR_VERSION == 5
-					.ButtonStyle(FEditorStyle::Get(), "SimpleButton")
-#endif
 					.OnClicked(this, &SPlasticSourceControlLocksWidget::OnConfigureLockRulesClicked, OrganizationName)
 					[
 						SNew(SHorizontalBox)
@@ -117,11 +102,7 @@ void SPlasticSourceControlLocksWidget::Construct(const FArguments& InArgs)
 						.HAlign(HAlign_Center)
 						[
 							SNew(SImage)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 							.Image(FAppStyle::GetBrush("PropertyWindow.Locked"))
-#else
-							.Image(FEditorStyle::GetBrush("PropertyWindow.Locked"))
-#endif
 						]
 						+SHorizontalBox::Slot()
 						.AutoWidth()
@@ -129,11 +110,7 @@ void SPlasticSourceControlLocksWidget::Construct(const FArguments& InArgs)
 						.Padding(5.0f, 0.0f, 0.0f, 0.0f)
 						[
 							SNew(STextBlock)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 							.TextStyle(&FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
-#else
-							.TextStyle(&FEditorStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
-#endif
 							.Text(LOCTEXT("ConfigureLockRules", "Configure rules"))
 						]
 					]
@@ -187,11 +164,7 @@ void SPlasticSourceControlLocksWidget::Construct(const FArguments& InArgs)
 
 TSharedRef<SWidget> SPlasticSourceControlLocksWidget::CreateToolBar()
 {
-#if ENGINE_MAJOR_VERSION >= 5
 	FSlimHorizontalToolBarBuilder ToolBarBuilder(nullptr, FMultiBoxCustomization::None);
-#else
-	FToolBarBuilder ToolBarBuilder(nullptr, FMultiBoxCustomization::None);
-#endif
 
 	ToolBarBuilder.AddToolBarButton(
 		FUIAction(FExecuteAction::CreateLambda([this]()
@@ -202,11 +175,7 @@ TSharedRef<SWidget> SPlasticSourceControlLocksWidget::CreateToolBar()
 		NAME_None,
 		LOCTEXT("SourceControl_RefreshButton", "Refresh"),
 		LOCTEXT("SourceControl_RefreshButton_Tooltip", "Refreshes locks from revision control provider."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Refresh"));
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Refresh"));
-#endif
 
 	return ToolBarBuilder.MakeWidget();
 }
@@ -470,11 +439,7 @@ void SPlasticSourceControlLocksWidget::SortLockView()
 
 	auto ComparePaths = [](const FPlasticSourceControlLock* Lhs, const FPlasticSourceControlLock* Rhs)
 	{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		return UE::ComparisonUtility::CompareNaturalOrder(*Lhs->Path, *Rhs->Path);
-#else
-		return FCString::Stricmp(*Lhs->Path, *Rhs->Path);
-#endif
 	};
 
 	auto CompareOwners = [](const FPlasticSourceControlLock* Lhs, const FPlasticSourceControlLock* Rhs)
@@ -685,13 +650,9 @@ void SPlasticSourceControlLocksWidget::ExecuteUnlock(TArray<FPlasticSourceContro
 		LOCTEXT("ReleaseLocksDialog", "Releasing locks will allow other users to keep working on these files and retrieve locks (on the same branch, in the latest revision). Would you like to release {0} lock(s)?"),
 		FText::AsNumber(InSelectedLocks.Num()));
 	const EAppReturnType::Type Choice = FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		EAppMsgCategory::Info,
-#endif
 		EAppMsgType::YesNo, UnlockQuestion
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		, bInRemove ? LOCTEXT("RemoveLocksTitle", "Remove Lock(s)?") : LOCTEXT("ReleaseLocksTitle", "Release Lock(s)?")
-#endif
 	);
 	if (Choice == EAppReturnType::Yes)
 	{

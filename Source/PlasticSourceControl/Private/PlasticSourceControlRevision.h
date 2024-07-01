@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "ISourceControlRevision.h"
 #include "ISourceControlState.h"
-#include "Runtime/Launch/Resources/Version.h"
 
 class FPlasticSourceControlState;
 
@@ -22,11 +21,7 @@ public:
 	}
 
 	/** ISourceControlRevision interface */
-#if ENGINE_MAJOR_VERSION == 4
-	virtual bool Get(FString& InOutFilename) const override;
-#elif ENGINE_MAJOR_VERSION == 5
 	virtual bool Get(FString& InOutFilename, EConcurrency::Type InConcurrency = EConcurrency::Synchronous) const override;
-#endif
 	virtual bool GetAnnotated(TArray<FAnnotationLine>& OutLines) const override;
 	virtual bool GetAnnotated(FString& InOutFilename) const override;
 	virtual const FString& GetFilename() const override;

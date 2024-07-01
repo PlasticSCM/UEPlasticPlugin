@@ -40,17 +40,12 @@
 #include "Widgets/Views/SHeaderRow.h"
 #include "Widgets/SBoxPanel.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "ISourceControlWindowsModule.h"
 #include "Misc/ComparisonUtility.h"
 #include "Selection.h"
 #include "WorldPartition/WorldPartitionActorDesc.h"
 #include "WorldPartition/WorldPartitionActorDescUtils.h"
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControlChangesetWindow"
 
@@ -87,11 +82,7 @@ void SPlasticSourceControlChangesetsWidget::Construct(const FArguments& InArgs)
 		.AutoHeight()
 		[
 			SNew(SBorder)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 			.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
-#else
-			.BorderImage(FEditorStyle::GetBrush("ToolPanel.GroupBorder"))
-#endif
 			.Padding(4.0f)
 			[
 				SNew(SHorizontalBox)
@@ -145,11 +136,7 @@ void SPlasticSourceControlChangesetsWidget::Construct(const FArguments& InArgs)
 					SNew(SButton)
 					.ContentPadding(FMargin(6.0f, 0.0f))
 					.ToolTipText(LOCTEXT("PlasticBranchesWindowTooltip", "Open the Branches window."))
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 					.ButtonStyle(FAppStyle::Get(), "SimpleButton")
-#elif ENGINE_MAJOR_VERSION == 5
-					.ButtonStyle(FEditorStyle::Get(), "SimpleButton")
-#endif
 					.OnClicked_Lambda([]()
 						{
 							FPlasticSourceControlModule::Get().GetBranchesWindow().OpenTab();
@@ -163,11 +150,7 @@ void SPlasticSourceControlChangesetsWidget::Construct(const FArguments& InArgs)
 						.HAlign(HAlign_Center)
 						[
 							SNew(SImage)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 							.Image(FAppStyle::GetBrush("SourceControl.Branch"))
-#else
-							.Image(FEditorStyle::GetBrush("SourceControl.Branch"))
-#endif
 						]
 						+SHorizontalBox::Slot()
 						.AutoWidth()
@@ -175,11 +158,7 @@ void SPlasticSourceControlChangesetsWidget::Construct(const FArguments& InArgs)
 						.Padding(5.0f, 0.0f, 0.0f, 0.0f)
 						[
 							SNew(STextBlock)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 							.TextStyle(&FAppStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
-#else
-							.TextStyle(&FEditorStyle::Get().GetWidgetStyle<FTextBlockStyle>("NormalText"))
-#endif
 							.Text(LOCTEXT("PlasticBranchesWindow", "Branches"))
 						]
 					]
@@ -194,9 +173,7 @@ void SPlasticSourceControlChangesetsWidget::Construct(const FArguments& InArgs)
 
 			// Left slot: Changesets area.
 			+SSplitter::Slot()
-#if ENGINE_MAJOR_VERSION == 5
 			.Resizable(true)
-#endif
 			.SizeRule(SSplitter::FractionOfParent)
 			.Value(ChangesetAreaRatio)
 			[
@@ -219,9 +196,7 @@ void SPlasticSourceControlChangesetsWidget::Construct(const FArguments& InArgs)
 
 			// Right slot: Files associated to the selected changeset.
 			+SSplitter::Slot()
-#if ENGINE_MAJOR_VERSION == 5
 			.Resizable(true)
-#endif
 			.SizeRule(SSplitter::FractionOfParent)
 			.Value(FileAreaRatio)
 			[
@@ -281,22 +256,14 @@ void SPlasticSourceControlChangesetsWidget::Construct(const FArguments& InArgs)
 
 TSharedRef<SWidget> SPlasticSourceControlChangesetsWidget::CreateToolBar()
 {
-#if ENGINE_MAJOR_VERSION >= 5
 	FSlimHorizontalToolBarBuilder ToolBarBuilder(nullptr, FMultiBoxCustomization::None);
-#else
-	FToolBarBuilder ToolBarBuilder(nullptr, FMultiBoxCustomization::None);
-#endif
 
 	ToolBarBuilder.AddToolBarButton(
 		FUIAction(FExecuteAction::CreateLambda([this]() { bShouldRefresh = true; })),
 		NAME_None,
 		LOCTEXT("SourceControl_RefreshButton", "Refresh"),
 		LOCTEXT("SourceControl_RefreshButton_Tooltip", "Refreshes changesets from revision control provider."),
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		FSlateIcon(FAppStyle::GetAppStyleSetName(), "SourceControl.Actions.Refresh"));
-#else
-		FSlateIcon(FEditorStyle::GetStyleSetName(), "SourceControl.Actions.Refresh"));
-#endif
 
 	return ToolBarBuilder.MakeWidget();
 }
@@ -393,11 +360,7 @@ TSharedRef<SWidget> SPlasticSourceControlChangesetsWidget::CreateFilesListView()
 		.OnGenerateRow(this, &SPlasticSourceControlChangesetsWidget::OnGenerateRow)
 		.SelectionMode(ESelectionMode::Multi)
 		.OnContextMenuOpening(this, &SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 		.OnMouseButtonDoubleClick(this, &SPlasticSourceControlChangesetsWidget::OnLocateFileClicked)
-#else
-		.OnMouseButtonDoubleClick(this, &SPlasticSourceControlChangesetsWidget::OnDiffRevisionClicked)
-#endif
 		.OnItemToString_Debug_Lambda([this](FPlasticSourceControlStateRef FileState) { return FileState->LocalFilename; })
 		.HeaderRow
 		(
@@ -408,11 +371,7 @@ TSharedRef<SWidget> SPlasticSourceControlChangesetsWidget::CreateFilesListView()
 			.DefaultLabel(PlasticSourceControlChangesetFilesListViewColumn::Icon::GetDisplayText()) // Displayed in the drop down menu to show/hide columns
 			.DefaultTooltip(PlasticSourceControlChangesetFilesListViewColumn::Icon::GetToolTipText())
 			.ShouldGenerateWidget(true) // Ensure the column cannot be hidden (grayed out in the show/hide drop down menu)
-#if ENGINE_MAJOR_VERSION >= 5
 			.FillSized(18)
-#else
-			.FixedWidth(18.0f)
-#endif
 			.HeaderContentPadding(FMargin(0))
 			.SortPriority(this, &SPlasticSourceControlChangesetsWidget::GetFilesColumnSortPriority, PlasticSourceControlChangesetFilesListViewColumn::Icon::Id())
 			.SortMode(this, &SPlasticSourceControlChangesetsWidget::GetFilesColumnSortMode, PlasticSourceControlChangesetFilesListViewColumn::Icon::Id())
@@ -430,13 +389,7 @@ TSharedRef<SWidget> SPlasticSourceControlChangesetsWidget::CreateFilesListView()
 					.Visibility_Lambda([this](){ return GetFilesColumnSortMode(PlasticSourceControlChangesetFilesListViewColumn::Icon::Id()) == EColumnSortMode::None ? EVisibility::Visible : EVisibility::Collapsed; })
 					[
 						SNew(SImage)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 						.Image(FAppStyle::Get().GetBrush("SourceControl.ChangelistsTab"))
-#elif ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION == 0
-						.Image(FEditorStyle::GetBrush("SourceControl.ChangelistsTab"))
-#else
-						.Image(FEditorStyle::GetBrush("SourceControl.StatusIcon.On"))
-#endif
 						.ColorAndOpacity(FSlateColor::UseSubduedForeground())
 					]
 				]
@@ -716,11 +669,7 @@ void SPlasticSourceControlChangesetsWidget::SortChangesetsView()
 
 	auto CompareBranches = [](const FPlasticSourceControlChangeset* Lhs, const FPlasticSourceControlChangeset* Rhs)
 	{
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		return UE::ComparisonUtility::CompareNaturalOrder(*Lhs->Branch, *Rhs->Branch);
-#else
-		return FCString::Stricmp(*Lhs->Branch, *Rhs->Branch);
-#endif
 	};
 
 	auto GetCompareFunc = [&](const FName& ColumnId)
@@ -1082,8 +1031,6 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenChangesetContex
 	return ToolMenus->GenerateWidget(Menu);
 }
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-
 // Inspired by Engine\Source\Editor\SourceControlWindowExtender\Private\SourceControlWindowExtenderModule.cpp FSourceControlWindowExtenderModule::GetAssetsFromFilenames()
 static void GetAssetsFromFilenames(const TArray<FString>& Filenames, TArray<FAssetData>& OutNonActorAssets, TArray<FAssetData>& OutCurrentWorldLoadedActors, TArray<FAssetData>& OutCurrentWorldUnloadedActors)
 {
@@ -1126,8 +1073,6 @@ static void GetAssetsFromFilenames(const TArray<FString>& Filenames, TArray<FAss
 	}
 }
 
-#endif
-
 static FString ConvertRelativePathToFull(const FPlasticSourceControlStatePtr& InSelectedFile)
 {
 	static const FString& WorkspaceRoot = FPlasticSourceControlModule::Get().GetProvider().GetPathToWorkspaceRoot();
@@ -1165,12 +1110,10 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu
 	}
 
 	// Note: none of the logic to populate the context menu cannot be used in UE5.0
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	TArray<FAssetData> SelectedAssets;
 	TArray<FAssetData> CurrentWorldLoadedActors;
 	TArray<FAssetData> CurrentWorldUnloadedActors;
 	GetAssetsFromFilenames(ConvertRelativePathToFull(SelectedFiles), SelectedAssets, CurrentWorldLoadedActors, CurrentWorldUnloadedActors);
-#endif
 
 	UToolMenus* ToolMenus = UToolMenus::Get();
 	static const FName MenuName = "PlasticSourceControl.FilesContextMenu";
@@ -1187,10 +1130,8 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu
 
 	FToolMenuSection& Section = *Menu->FindSection("Source Control");
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	// Only show the "Diff Against Previous" option if the selected file is "Changed" or "Moved" (not Added nor Deleted)
 	if ((SelectedFile->WorkspaceState == EWorkspaceState::CheckedOutChanged) || (SelectedFile->WorkspaceState == EWorkspaceState::Moved)) // NOLINT(readability/braces)
-#endif
 	{
 		Section.AddMenuEntry(
 			"DiffAgainstPrevious",
@@ -1204,10 +1145,8 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu
 		);
 	}
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	// Only show the "Diff Against Workspace" option if the selected asset is found in the workspace
 	if ((SelectedAssets.Num() > 0) || (CurrentWorldLoadedActors.Num() > 0) || (CurrentWorldUnloadedActors.Num() > 0)) // NOLINT(readability/braces)
-#endif
 	{
 		Section.AddMenuEntry(
 			"DiffAgainstWorkspace",
@@ -1252,11 +1191,9 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu
 		);
 	}
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	// Only show the "Diff Against Workspace" option if the selected asset is found in the workspace
 	// Note: as for now cm history does only work for assets found in the workspace, not if they were deleted
 	if ((SelectedAssets.Num() > 0) || (CurrentWorldLoadedActors.Num() > 0) || (CurrentWorldUnloadedActors.Num() > 0))
-#endif
 	{
 		Section.AddSeparator("PlasticSeparator1");
 
@@ -1272,7 +1209,6 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu
 		);
 	}
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	if (CurrentWorldLoadedActors.Num() > 0)
 	{
 		Section.AddSeparator("PlasticSeparator2");
@@ -1283,9 +1219,7 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu
 			FSlateIcon(),
 			FUIAction(FExecuteAction::CreateRaw(this, &SPlasticSourceControlChangesetsWidget::SelectActors, CurrentWorldLoadedActors)));
 	}
-#endif
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 	if (CurrentWorldLoadedActors.Num() > 0)
 	{
 		Section.AddMenuEntry(
@@ -1294,9 +1228,7 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu
 			FSlateIcon(),
 			FUIAction(FExecuteAction::CreateRaw(this, &SPlasticSourceControlChangesetsWidget::FocusActors, CurrentWorldLoadedActors)));
 	}
-#endif
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 	if (SelectedAssets.Num() > 0)
 	{
 		Section.AddSeparator("PlasticSeparator3");
@@ -1307,7 +1239,6 @@ TSharedPtr<SWidget> SPlasticSourceControlChangesetsWidget::OnOpenFileContextMenu
 			FSlateIcon(),
 			FUIAction(FExecuteAction::CreateRaw(this, &SPlasticSourceControlChangesetsWidget::BrowseToAssets, SelectedAssets)));
 	}
-#endif
 
 	return ToolMenus->GenerateWidget(Menu);
 }
@@ -1379,13 +1310,9 @@ void SPlasticSourceControlChangesetsWidget::OnSwitchToChangesetClicked(FPlasticS
 	const FText SwitchConfirmation = FText::Format(LOCTEXT("SwitchToChangesetDialog", "Are you sure you want to switch the workspace to the changeset {0} instead of a branch?\nSome information related to smart locks and to incoming changes won't be available."),
 		FText::AsNumber(InSelectedChangeset->ChangesetId));
 	const EAppReturnType::Type Choice = FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		EAppMsgCategory::Info,
-#endif
 		EAppMsgType::YesNo, SwitchConfirmation
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 		, LOCTEXT("SwitchToChangesetTitle", "Switch to changeset?")
-#endif
 	);
 	if (Choice == EAppReturnType::Yes)
 	{
@@ -1482,34 +1409,10 @@ static UPackage* LoadPackage(const FPlasticSourceControlStateRef& InSelectedFile
 	return AssetPackage;
 }
 
-#if ENGINE_MAJOR_VERSION == 4 || ENGINE_MINOR_VERSION < 3
-
-// Inspired by Engine\Source\Editor\UnrealEd\Private\DiffUtils.cpp DiffUtils::LoadPackageForDiff() in UE >= 5.1
-UPackage* LoadPackageForDiff(FPlasticSourceControlRevisionRef& InRevision)
-{
-	FString TempFileName;
-	if (InRevision->Get(TempFileName))
-	{
-		// Try and load that package
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-		return LoadPackage(nullptr, *TempFileName, LOAD_ForDiff | LOAD_DisableCompileOnLoad | LOAD_DisableEngineVersionChecks);
-#else
-		return LoadPackage(nullptr, *TempFileName, LOAD_ForDiff | LOAD_DisableCompileOnLoad);
-#endif
-	}
-	return nullptr;
-}
-
-#endif
-
 static UObject* GetAssetRevisionObject(FPlasticSourceControlRevisionRef& InRevision, FRevisionInfo& OutSelectedRevisionInfo)
 {
 	// try and load the temporary package
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 	UPackage* AssetPackage = DiffUtils::LoadPackageForDiff(InRevision);
-#else
-	UPackage* AssetPackage = LoadPackageForDiff(InRevision);
-#endif
 
 	// grab the asset from the package - we assume asset name matches file name
 	UObject* AssetObject = FindAssetInPackage(InRevision->Filename, AssetPackage);
@@ -1527,11 +1430,7 @@ static UObject* GetAssetRevisionObject(const FPlasticSourceControlStateRef& InSe
 	FPlasticSourceControlRevisionRef SelectedRevision = InSelectedFile->History[0];
 
 	// try and load the temporary package
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 	UPackage* AssetPackage = DiffUtils::LoadPackageForDiff(SelectedRevision);
-#else
-	UPackage* AssetPackage = LoadPackageForDiff(SelectedRevision);
-#endif
 
 	// grab the asset from the package
 	UObject* AssetObject = FindAssetInPackage(InSelectedFile->LocalFilename, AssetPackage);
@@ -1553,15 +1452,11 @@ static UObject* GetAssetWorkspaceObject(const FPlasticSourceControlStateRef& InS
 	return FindAssetInPackage(InSelectedFile->LocalFilename, AssetPackage);
 }
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-
 void SPlasticSourceControlChangesetsWidget::OnLocateFileClicked(FPlasticSourceControlStateRef InSelectedFile)
 {
 	// Behavior of the View Changes window: double click to focus on the file in the content browser or in the current level
 	ISourceControlWindowsModule::Get().OnChangelistFileDoubleClicked().Broadcast(ConvertRelativePathToFull(InSelectedFile));
 }
-
-#endif
 
 // Inspired by Engine\Source\Editor\SourceControlWindows\Private\SSourceControlHistoryWidget.cpp OnDiffAgainstPreviousRev()
 void SPlasticSourceControlChangesetsWidget::OnDiffRevisionClicked(FPlasticSourceControlStateRef InSelectedFile)
@@ -1746,8 +1641,6 @@ void SPlasticSourceControlChangesetsWidget::OnShowHistoryClicked(TArray<FPlastic
 	FSourceControlWindows::DisplayRevisionHistory(ConvertRelativePathToFull(InSelectedFiles));
 }
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
-
 // Inspired by Engine\Source\Editor\SourceControlWindowExtender\Private\SourceControlWindowExtenderModule.cpp FSourceControlWindowExtenderModule::()
 // Note: all these are only supported for versions after UE5.0
 // Note: all these are ready for multiple selection even though we don't support it yet
@@ -1774,10 +1667,6 @@ void SPlasticSourceControlChangesetsWidget::SelectActors(const TArray<FAssetData
 	bNotify = true;
 	GEditor->GetSelectedActors()->EndBatchSelectOperation(bNotify);
 }
-
-#endif
-
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 
 void SPlasticSourceControlChangesetsWidget::FocusActors(const TArray<FAssetData> InActorToFocus)
 {
@@ -1808,8 +1697,6 @@ void SPlasticSourceControlChangesetsWidget::BrowseToAssets(const TArray<FAssetDa
 {
 	GEditor->SyncBrowserToObjects(const_cast<TArray<FAssetData>&>(InAssets)); // Note: const cast for UE5.2
 }
-
-#endif
 
 void SPlasticSourceControlChangesetsWidget::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
 {

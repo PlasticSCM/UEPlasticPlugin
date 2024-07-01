@@ -26,9 +26,7 @@
 #include "Misc/MessageDialog.h"
 #include "HAL/PlatformProcess.h"
 #include "Misc/QueuedThreadPool.h"
-#if ENGINE_MAJOR_VERSION == 5
 #include "UObject/ObjectSaveContext.h"
-#endif
 #include "UObject/SavePackage.h"
 
 #define LOCTEXT_NAMESPACE "PlasticSourceControl"
@@ -39,20 +37,12 @@ FPlasticSourceControlProvider::FPlasticSourceControlProvider()
 {
 	PlasticSourceControlSettings.LoadSettings();
 
-#if ENGINE_MAJOR_VERSION == 4
-	UPackage::PackageSavedEvent.AddRaw(this, &FPlasticSourceControlProvider::HandlePackageSaved);
-#elif ENGINE_MAJOR_VERSION == 5
 	UPackage::PackageSavedWithContextEvent.AddRaw(this, &FPlasticSourceControlProvider::HandlePackageSaved);
-#endif
 }
 
 FPlasticSourceControlProvider::~FPlasticSourceControlProvider()
 {
-#if ENGINE_MAJOR_VERSION == 4
-	UPackage::PackageSavedEvent.RemoveAll(this);
-#elif ENGINE_MAJOR_VERSION == 5
 	UPackage::PackageSavedWithContextEvent.RemoveAll(this);
-#endif
 }
 
 void FPlasticSourceControlProvider::Init(bool bForceConnection)
@@ -192,7 +182,6 @@ TSharedRef<FPlasticSourceControlState, ESPMode::ThreadSafe> FPlasticSourceContro
 	}
 }
 
-#if ENGINE_MAJOR_VERSION == 5
 TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> FPlasticSourceControlProvider::GetStateInternal(const FPlasticSourceControlChangelist& InChangelist)
 {
 	TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe>* State = ChangelistsStateCache.Find(InChangelist);
@@ -209,14 +198,9 @@ TSharedRef<FPlasticSourceControlChangelistState, ESPMode::ThreadSafe> FPlasticSo
 		return NewState;
 	}
 }
-#endif
 
 // Note: called once for each asset being saved, which can be hundreds in the case of a map using One File Per Actor (OFPA) in UE5
-#if ENGINE_MAJOR_VERSION == 4
-void FPlasticSourceControlProvider::HandlePackageSaved(const FString& InPackageFilename, UObject* Outer)
-#else
 void FPlasticSourceControlProvider::HandlePackageSaved(const FString& InPackageFilename, UPackage* InPackage, FObjectPostSaveContext InObjectSaveContext)
-#endif
 {
 	const FString AbsoluteFilename = FPaths::ConvertRelativePathToFull(InPackageFilename);
 	auto FileState = GetStateInternal(AbsoluteFilename);
@@ -275,7 +259,6 @@ FText FPlasticSourceControlProvider::GetStatusText() const
 	return FText::Format(LOCTEXT("PlasticStatusText", "{ErrorText}Unity Version Control (formerly Plastic SCM) {PlasticScmVersion}\t(plugin v{PluginVersion})\nWorkspace: {WorkspaceName}  ({WorkspacePath})\n{WorkspaceSelector}@{RepositoryName}@{ServerUrl}\nChangeset: {ChangesetNumber}\nUser: '{UserName}'  {DisplayName}"), Args);
 }
 
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 TMap<ISourceControlProvider::EStatus, FString> FPlasticSourceControlProvider::GetStatus() const
 {
 	TMap<EStatus, FString> Result;
@@ -294,7 +277,6 @@ TMap<ISourceControlProvider::EStatus, FString> FPlasticSourceControlProvider::Ge
 	}
 	return Result;
 }
-#endif
 
 /** Quick check if source control is enabled. Specifically, it returns true if a source control provider is set (regardless of whether the provider is available) and false if no provider is set. So all providers except the stub DefaultSourceProvider will return true. */
 bool FPlasticSourceControlProvider::IsEnabled() const
@@ -366,7 +348,6 @@ ECommandResult::Type FPlasticSourceControlProvider::GetState(const TArray<FStrin
 	return ECommandResult::Succeeded;
 }
 
-#if ENGINE_MAJOR_VERSION == 5
 ECommandResult::Type FPlasticSourceControlProvider::GetState(const TArray<FSourceControlChangelistRef>& InChangelists, TArray<FSourceControlChangelistStateRef>& OutState, EStateCacheUsage::Type InStateCacheUsage)
 {
 	if (!IsEnabled())
@@ -409,7 +390,6 @@ TArray<FSourceControlChangelistStateRef> FPlasticSourceControlProvider::GetCache
 	}
 	return Result;
 }
-#endif
 
 TArray<FSourceControlStateRef> FPlasticSourceControlProvider::GetCachedStateByPredicate(TFunctionRef<bool(const FSourceControlStateRef&)> Predicate) const
 {
@@ -440,11 +420,7 @@ void FPlasticSourceControlProvider::UnregisterSourceControlStateChanged_Handle(F
 	OnSourceControlStateChanged.Remove(Handle);
 }
 
-#if ENGINE_MAJOR_VERSION == 5
 	ECommandResult::Type FPlasticSourceControlProvider::Execute(const FSourceControlOperationRef& InOperation, FSourceControlChangelistPtr InChangelist, const TArray<FString>& InFiles, EConcurrency::Type InConcurrency, const FSourceControlOperationComplete& InOperationCompleteDelegate)
-#else
-	ECommandResult::Type FPlasticSourceControlProvider::Execute(const FSourceControlOperationRef& InOperation, const TArray<FString>& InFiles,	EConcurrency::Type InConcurrency, const FSourceControlOperationComplete& InOperationCompleteDelegate)
-#endif
 {
 	if (!bWorkspaceFound && !(InOperation->GetName() == "Connect") && !(InOperation->GetName() == "GetProjects") && !(InOperation->GetName() == "MakeWorkspace"))
 	{
@@ -461,11 +437,7 @@ void FPlasticSourceControlProvider::UnregisterSourceControlStateChanged_Handle(F
 		FFormatNamedArguments Arguments;
 		Arguments.Add(TEXT("OperationName"), FText::FromName(InOperation->GetName()));
 		Arguments.Add(TEXT("ProviderName"), FText::FromName(GetName()));
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 		FText Message = FText::Format(LOCTEXT("UnsupportedOperation", "Operation '{OperationName}' not supported by revision control provider '{ProviderName}'"), Arguments);
-#else
-		FText Message = FText::Format(LOCTEXT("UnsupportedOperation", "Operation '{OperationName}' not supported by source control provider '{ProviderName}'"), Arguments);
-#endif
 
 		FMessageLog("SourceControl").Error(Message);
 		InOperation->AddErrorMessge(Message);
@@ -478,10 +450,8 @@ void FPlasticSourceControlProvider::UnregisterSourceControlStateChanged_Handle(F
 	Command->Files = SourceControlHelpers::AbsoluteFilenames(InFiles);
 	Command->OperationCompleteDelegate = InOperationCompleteDelegate;
 
-#if ENGINE_MAJOR_VERSION == 5
 	TSharedPtr<FPlasticSourceControlChangelist, ESPMode::ThreadSafe> ChangelistPtr = StaticCastSharedPtr<FPlasticSourceControlChangelist>(InChangelist);
 	Command->Changelist = ChangelistPtr ? ChangelistPtr.ToSharedRef().Get() : FPlasticSourceControlChangelist();
-#endif
 
 	// fire off operation
 	if (InConcurrency == EConcurrency::Synchronous)
@@ -537,13 +507,7 @@ bool FPlasticSourceControlProvider::UsesCheckout() const
 
 bool FPlasticSourceControlProvider::UsesFileRevisions() const
 {
-	// This API introduced in UE5.1 was broken until they finally merged our PR in UE5.5
-	// (preventing the user to use the source control context menu for checkin if returning false)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5
 	return IsPartialWorkspace();
-#else
-	return true;
-#endif
 }
 
 bool FPlasticSourceControlProvider::UsesSnapshots() const
@@ -629,22 +593,16 @@ void FPlasticSourceControlProvider::UpdateWorkspaceStatus(const class FPlasticSo
 					const FText UnsupportedVersionWarning = FText::Format(LOCTEXT("Plastic_UnsupportedVersion", "Unity Version Control {PlasticScmVersion} is not supported anymore by this plugin.\nUnity Version Control {OldestSupportedPlasticScmVersion} or a more recent version is required.\nPlease upgrade to the latest version."), Args);
 					FMessageLog("SourceControl").Warning(UnsupportedVersionWarning);
 					FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 						EAppMsgCategory::Warning,
-#endif
 						EAppMsgType::Ok, UnsupportedVersionWarning
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 						, LOCTEXT("Plastic_UnsuportedVersionTitle", "Unsupported version!")
-#endif
 					);
 				}
 			}
 			else if (InCommand.ErrorMessages.Num() > 0)
 			{
 				FMessageDialog::Open(
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 					EAppMsgCategory::Error,
-#endif
 					EAppMsgType::Ok, FText::FromString(InCommand.ErrorMessages[0]));
 			}
 		}
@@ -757,7 +715,6 @@ TArray<TSharedRef<ISourceControlLabel>> FPlasticSourceControlProvider::GetLabels
 	return Tags;
 }
 
-#if ENGINE_MAJOR_VERSION == 5
 TArray<FSourceControlChangelistRef> FPlasticSourceControlProvider::GetChangelists(EStateCacheUsage::Type InStateCacheUsage)
 {
 	if (!IsEnabled())
@@ -777,7 +734,6 @@ TArray<FSourceControlChangelistRef> FPlasticSourceControlProvider::GetChangelist
 	Algo::Transform(ChangelistsStateCache, Changelists, [](const auto& Pair) { return MakeShared<FPlasticSourceControlChangelist, ESPMode::ThreadSafe>(Pair.Key); });
 	return Changelists;
 }
-#endif
 
 #if SOURCE_CONTROL_WITH_SLATE
 TSharedRef<class SWidget> FPlasticSourceControlProvider::MakeSettingsWidget() const
@@ -800,36 +756,12 @@ ECommandResult::Type FPlasticSourceControlProvider::ExecuteSynchronousCommand(FP
 		IssueCommand(InCommand);
 
 		// ... then wait for its completion (thus making it synchronous)
-#if ENGINE_MAJOR_VERSION == 4 || ENGINE_MINOR_VERSION < 1
-		double LastProgressTimestamp = FPlatformTime::Seconds();
-		double ProgressUpdateThreshold = .0;
-#endif
 		while (!InCommand.bExecuteProcessed)
 		{
 			// Tick the command queue and update progress.
 			Tick();
 
-#if ENGINE_MAJOR_VERSION == 4 || ENGINE_MINOR_VERSION < 1
-			const double CurrentTimestamp = FPlatformTime::Seconds();
-			const double ElapsedTime = CurrentTimestamp - LastProgressTimestamp;
-
-			// Note: calling too many times Progress.Tick() crashes the GPU Out of Memory
-			// We need to reduce the number of calls we make, but we don't want to have the progress bar stuttering horribly
-			// So we tart to update it frequently/smoothly, and then we increase the intervals more and more (arithmetic series, with a cap)
-			// in order to reduce the video memory usage for very long operation without visual penalty on quicker daily operations.
-			if (ElapsedTime > ProgressUpdateThreshold)
-			{
-#endif
-				Progress.Tick();
-
-#if ENGINE_MAJOR_VERSION == 4 || ENGINE_MINOR_VERSION < 1
-				LastProgressTimestamp = CurrentTimestamp;
-				if (ProgressUpdateThreshold < 0.25)
-				{
-					ProgressUpdateThreshold += 0.001;
-				}
-			}
-#endif
+			Progress.Tick();
 
 			// Sleep for a bit so we don't busy-wait so much.
 			FPlatformProcess::Sleep(0.01f);

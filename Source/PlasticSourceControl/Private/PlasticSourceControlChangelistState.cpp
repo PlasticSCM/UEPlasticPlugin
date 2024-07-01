@@ -2,8 +2,6 @@
 
 #include "PlasticSourceControlChangelistState.h"
 
-#if ENGINE_MAJOR_VERSION == 5
-
 #define LOCTEXT_NAMESPACE "PlasticSourceControl.ChangelistState"
 
 FName FPlasticSourceControlChangelistState::GetIconName() const
@@ -37,8 +35,6 @@ const FDateTime& FPlasticSourceControlChangelistState::GetTimeStamp() const
 	return TimeStamp;
 }
 
-#if ENGINE_MINOR_VERSION >= 4
-
 const TArray<FSourceControlStateRef> FPlasticSourceControlChangelistState::GetFilesStates() const
 {
 	return Files;
@@ -59,20 +55,6 @@ int32 FPlasticSourceControlChangelistState::GetShelvedFilesStatesNum() const
 	return ShelvedFiles.Num();
 }
 
-#else // ENGINE_MINOR_VERSION < 4
-
-const TArray<FSourceControlStateRef>& FPlasticSourceControlChangelistState::GetFilesStates() const
-{
-	return Files;
-}
-
-const TArray<FSourceControlStateRef>& FPlasticSourceControlChangelistState::GetShelvedFilesStates() const
-{
-	return ShelvedFiles;
-}
-
-#endif // ENGINE_MINOR_VERSION
-
 FSourceControlChangelistRef FPlasticSourceControlChangelistState::GetChangelist() const
 {
 	FPlasticSourceControlChangelistRef ChangelistCopy = MakeShareable( new FPlasticSourceControlChangelist(Changelist));
@@ -80,5 +62,3 @@ FSourceControlChangelistRef FPlasticSourceControlChangelistState::GetChangelist(
 }
 
 #undef LOCTEXT_NAMESPACE
-
-#endif

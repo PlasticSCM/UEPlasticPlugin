@@ -16,11 +16,8 @@
 #include "Misc/Paths.h"
 #include "XmlParser.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5
 #include "PlasticSourceControlChangelist.h"
 #include "PlasticSourceControlChangelistState.h"
-#endif
 
 namespace PlasticSourceControlParsers
 {
@@ -449,7 +446,6 @@ void ParseDirectoryStatusResult(const FString& InDir, const TArray<FString>& InR
 			State->WorkspaceState = EWorkspaceState::Controlled;
 		}
 
-#if ENGINE_MAJOR_VERSION == 5
 		// also remove the file from its changelist if any
 		if (State->Changelist.IsInitialized())
 		{
@@ -459,7 +455,6 @@ void ParseDirectoryStatusResult(const FString& InDir, const TArray<FString>& InR
 			// 2- And reset the reference to their previous changelist
 			State->Changelist.Reset();
 		}
-#endif
 	}
 }
 
@@ -963,11 +958,7 @@ static bool ParseHistoryResults(const bool bInUpdateHistory, const FXmlFile& InX
 			// except in case of a merge conflict, where the Editor expects the tip of the "source (remote)" branch to be at the top of the history!
 			if (   (SourceControlRevision->ChangesetNumber > InOutState.DepotRevisionChangeset)
 				&& (SourceControlRevision->Branch != CurrentBranch)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
 				&& (SourceControlRevision->GetRevision() != InOutState.PendingResolveInfo.RemoteRevision))
-#else
-				&& (SourceControlRevision->ChangesetNumber != InOutState.PendingMergeSourceChangeset))
-#endif
 			{
 				InOutState.HeadBranch = SourceControlRevision->Branch;
 				InOutState.HeadAction = SourceControlRevision->Action;
@@ -1149,8 +1140,6 @@ FText ParseCheckInResults(const TArray<FString>& InResults)
 	}
 	return FText();
 }
-
-#if ENGINE_MAJOR_VERSION == 5
 
 /**
  * Parse results of the 'cm status --changelists --controlledchanged --noheader --xml --encoding="utf-8"' command.
@@ -1360,11 +1349,7 @@ bool ParseShelveDiffResult(const FString InWorkspaceRoot, TArray<FString>&& InRe
 		EWorkspaceState ShelveState = ParseShelveFileStatus(Result[0]);
 
 		// Remove outer double quotes
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5
 		Result.MidInline(3, Result.Len() - 4, EAllowShrinking::No);
-#else
-		Result.MidInline(3, Result.Len() - 4, false);
-#endif
 
 		FString MovedFrom;
 		if (ShelveState == EWorkspaceState::Moved)
@@ -1515,11 +1500,7 @@ bool ParseShelveDiffResults(const FString InWorkspaceRoot, TArray<FString>&& InR
 			const int32 BaseRevisionId = FCString::Atoi(*ResultElements[1]);
 			// Remove outer double quotes on filename
 			FString File = MoveTemp(ResultElements[2]);
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 5
 			File.MidInline(1, File.Len() - 2, EAllowShrinking::No);
-#else
-			File.MidInline(1, File.Len() - 2, false);
-#endif
 			FString AbsoluteFilename = FPaths::ConvertRelativePathToFull(InWorkspaceRoot, File);
 
 			if (ShelveState == EWorkspaceState::Moved)
@@ -1634,8 +1615,6 @@ bool ParseShelvesResult(const FString& InResults, FString& OutComment, FDateTime
 
 	return bResult;
 }
-
-#endif
 
 
 /**

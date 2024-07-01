@@ -7,11 +7,7 @@
 #include "ISourceControlProvider.h"
 #include "IPlasticSourceControlWorker.h"
 
-#include "Runtime/Launch/Resources/Version.h"
-
-#if ENGINE_MAJOR_VERSION == 5
 #include "PlasticSourceControlChangelist.h"
-#endif
 
 /**
  * Used to execute Plastic commands multi-threaded.
@@ -96,10 +92,8 @@ public:
 	/** Files to perform this operation on */
 	TArray<FString> Files;
 
-#if ENGINE_MAJOR_VERSION == 5
 	/** Changelist to perform this operation on */
 	FPlasticSourceControlChangelist Changelist;
-#endif
 
 	/**Info and/or warning message storage*/
 	TArray<FString> InfoMessages;

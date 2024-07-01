@@ -23,22 +23,13 @@
 #include "Widgets/Layout/SSeparator.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/SBoxPanel.h"
-#include "Runtime/Launch/Resources/Version.h"
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 #include "Styling/AppStyle.h"
-#else
-#include "EditorStyleSet.h"
-#endif
 
 #define LOCTEXT_NAMESPACE "SPlasticSourceControlSettings"
 
 void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 {
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
 	const FSlateFontInfo Font = FAppStyle::GetFontStyle(TEXT("SourceControl.LoginWindow.Font"));
-#else
-	const FSlateFontInfo Font = FEditorStyle::GetFontStyle(TEXT("SourceControl.LoginWindow.Font"));
-#endif
 
 	bAutoCreateIgnoreFile = CanAutoCreateIgnoreFile();
 	WorkspaceParams.bAutoInitialCommit = true;
@@ -76,12 +67,6 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 
 	ChildSlot
 	[
-#if ENGINE_MAJOR_VERSION == 4
-	SNew(SBorder)
-	.BorderImage(FEditorStyle::GetBrush("DetailsView.CategoryBottom"))
-	.Padding(FMargin(0.0f, 3.0f, 0.0f, 0.0f))
-	[
-#endif
 		SNew(SVerticalBox)
 		// Path to the CLI
 		// Versions (Plugin & Unity Version Control) useful eg to help diagnose issues from screenshots
@@ -94,7 +79,7 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 			.ToolTipText(LOCTEXT("PlasticVersions_Tooltip", "Unity Version Control (formerly Plastic SCM) and Plugin versions"))
 			+SHorizontalBox::Slot()
 			.FillWidth(1.0f)
-            .Padding(0.0f, 3.0f)
+			.Padding(0.0f, 3.0f)
 			[
 				SNew(STextBlock)
 				.Text(LOCTEXT("PlasticVersions", "Unity Version Control"))
@@ -111,7 +96,7 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 			]
 			+SHorizontalBox::Slot()
 			.FillWidth(1.5f)
-            .Padding(4.0f, 3.0f)
+			.Padding(4.0f, 3.0f)
 			[
 				SNew(STextBlock)
 				.Text(this, &SPlasticSourceControlSettings::GetVersions)
@@ -256,7 +241,7 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 			.ToolTipText(LOCTEXT("ServerUrl_Tooltip", "Enter the cloud organization (eg. YourOrganization@cloud, YourOrganization@unity, local) or the Server URL in the form address:port or ssl://ip:port (eg localhost:8087)"))
 			+SHorizontalBox::Slot()
 			.FillWidth(1.0f)
-            .Padding(0.0f, 4.0f)
+			.Padding(0.0f, 4.0f)
 			[
 				SNew(STextBlock)
 				.Text(LOCTEXT("ServerUrl", "Organization or server"))
@@ -298,10 +283,10 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 		[
 			SNew(SHorizontalBox)
 			.Visibility(this, &SPlasticSourceControlSettings::CanSelectProject)
-            .ToolTipText(LOCTEXT("ProjectName_Tooltip", "Select the name of the Project to use"))
+			.ToolTipText(LOCTEXT("ProjectName_Tooltip", "Select the name of the Project to use"))
 			+SHorizontalBox::Slot()
 			.FillWidth(1.0f)
-            .Padding(0.0f, 4.0f)
+			.Padding(0.0f, 4.0f)
 			[
 				SNew(STextBlock)
 				.Text(LOCTEXT("ProjectName", "Organization's project"))
@@ -352,10 +337,10 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 		[
 			SNew(SHorizontalBox)
 			.Visibility(this, &SPlasticSourceControlSettings::CanCreatePlasticWorkspace)
-            .ToolTipText(LOCTEXT("RepositoryName_Tooltip", "Enter the Name of the Repository to use or create"))
+			.ToolTipText(LOCTEXT("RepositoryName_Tooltip", "Enter the Name of the Repository to use or create"))
 			+SHorizontalBox::Slot()
 			.FillWidth(1.0f)
-            .Padding(0.0f, 3.0f)
+			.Padding(0.0f, 3.0f)
 			[
 				SNew(STextBlock)
 				.Text(LOCTEXT("RepositoryName", "Repository name"))
@@ -380,10 +365,10 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 		[
 			SNew(SHorizontalBox)
 			.Visibility(this, &SPlasticSourceControlSettings::CanCreatePlasticWorkspace)
-            .ToolTipText(LOCTEXT("WorkspaceName_Tooltip", "Enter the Name of the new Workspace to create"))
+			.ToolTipText(LOCTEXT("WorkspaceName_Tooltip", "Enter the Name of the new Workspace to create"))
 			+SHorizontalBox::Slot()
 			.FillWidth(1.0f)
-            .Padding(0.0f, 3.0f)
+			.Padding(0.0f, 3.0f)
 			[
 				SNew(STextBlock)
 				.Text(LOCTEXT("WorkspaceName", "Workspace name"))
@@ -548,11 +533,7 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
 						.OnCheckStateChanged(this, &SPlasticSourceControlSettings::OnCheckedEnableVerboseLogs)
 						[
 							SNew(STextBlock)
-#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 							.Text(LOCTEXT("EnableVerboseLogs", "Enable Revision Control Verbose logs"))
-#else
-							.Text(LOCTEXT("EnableVerboseLogs", "Enable Source Control Verbose logs"))
-#endif
 							.Font(Font)
 						]
 					]
@@ -598,9 +579,6 @@ void SPlasticSourceControlSettings::Construct(const FArguments& InArgs)
                 .HAlign(HAlign_Center)
             ]
         ]
-#if ENGINE_MAJOR_VERSION == 4
-	]
-#endif
 	];
 }
 

@@ -6,7 +6,6 @@
 #include "PlasticSourceControlModule.h"
 #include "PlasticSourceControlOperations.h"
 #include "PlasticSourceControlProvider.h"
-#include "PlasticSourceControlStyle.h"
 #include "PlasticSourceControlUtils.h"
 #include "PlasticSourceControlVersions.h"
 #include "SPlasticSourceControlStatusBar.h"
@@ -44,9 +43,6 @@ void FPlasticSourceControlMenu::Register()
 		return;
 	}
 
-	FPlasticSourceControlStyle::Initialize();
-	FPlasticSourceControlStyle::ReloadTextures();
-
 	// Register the menu extensions with the level editor
 	ExtendRevisionControlMenu();
 	ExtendAssetContextMenu();
@@ -69,8 +65,6 @@ void FPlasticSourceControlMenu::Unregister()
 		ToolMenus->UnregisterOwnerByName(UnityVersionControlStatusBarMenuOwnerName);
 		bHasRegistered = false;
 	}
-
-	FPlasticSourceControlStyle::Shutdown();
 }
 
 void FPlasticSourceControlMenu::ExtendToolbarWithStatusBarWidget()
@@ -624,10 +618,7 @@ void FPlasticSourceControlMenu::AddMenuExtension(FToolMenuSection& Menu)
 			{
 				return Provider.IsPartialWorkspace() ? LOCTEXT("PlasticDesktopAppTooltip", "Open the workspace in Unity Version Control Gluon Application.") : LOCTEXT("PlasticGluonTooltip", "Open the workspace in Unity Version Control Desktop Application.");
 			}),
-		TAttribute<FSlateIcon>::CreateLambda([&Provider]()
-			{
-				return FSlateIcon(FPlasticSourceControlStyle::Get().GetStyleSetName(), Provider.IsPartialWorkspace() ? "PlasticSourceControl.GluonIcon.Small" : "PlasticSourceControl.PluginIcon.Small");
-			}),
+		FSlateIcon(FAppStyle::GetAppStyleSetName(), "ClassIcon.UserDefinedStruct"),
 		FUIAction(FExecuteAction::CreateRaw(this, &FPlasticSourceControlMenu::OpenDesktopApplication))
 	);
 

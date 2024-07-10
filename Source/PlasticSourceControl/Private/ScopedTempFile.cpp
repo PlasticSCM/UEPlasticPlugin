@@ -18,9 +18,9 @@ FScopedTempFile::FScopedTempFile(const FString& InPrefix, const FString& InExten
 	Filename = FPaths::CreateTempFilename(*FPaths::ConvertRelativePathToFull(FPaths::ProjectLogDir()), *InPrefix, *InExtension);
 }
 
-FScopedTempFile::FScopedTempFile(const FString& InText)
+FScopedTempFile::FScopedTempFile(const FString& InText) :
+	FScopedTempFile(TEXT("Temp-"), TEXT(".txt"))
 {
-	Filename = FPaths::CreateTempFilename(*FPaths::ConvertRelativePathToFull(FPaths::ProjectLogDir()), TEXT("Temp-"), TEXT(".txt"));
 	if (!FFileHelper::SaveStringToFile(InText, *Filename, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM))
 	{
 		UE_LOG(LogSourceControl, Error, TEXT("Failed to write to temp file: %s"), *Filename);

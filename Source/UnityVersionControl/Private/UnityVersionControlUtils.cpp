@@ -477,27 +477,28 @@ public:
 
 	void SetLocks(const TArray<FUnityVersionControlLockRef>& InLocks)
 	{
-		FScopeLock Lock(&CriticalSection);
 		Locks = InLocks;
 		Timestamp = FDateTime::Now();
 	}
 
 	bool GetLocks(TArray<FUnityVersionControlLockRef>& OutLocks)
 	{
-		FScopeLock Lock(&CriticalSection);
 		const FTimespan ElapsedTime = FDateTime::Now() - Timestamp;
-		if (ElapsedTime.GetTotalSeconds() < 60.0)
+		if (ElapsedTime.GetTotalMinutes() < GetDefault<UUnityVersionControlProjectSettings>()->LocksCacheExpirationDelayMinutes)
 		{
+			UE_LOG(LogSourceControl, Verbose, TEXT("FLocksCache::GetLocks(%d)"), Locks.Num());
 			OutLocks = Locks;
 			return true;
 		}
 		return false;
 	}
 
+public:
+	FCriticalSection CriticalSection;
+
 private:
 	TArray<FUnityVersionControlLockRef> Locks;
 	FDateTime Timestamp;
-	FCriticalSection CriticalSection;
 };
 
 static FLocksCache LocksCacheForAllDestBranches;
@@ -505,6 +506,7 @@ static FLocksCache LocksCacheForWorkingBranch;
 
 void InvalidateLocksCache()
 {
+	UE_LOG(LogSourceControl, Verbose, TEXT("InvalidateLocksCache()"));
 	LocksCacheForAllDestBranches.Reset();
 	LocksCacheForWorkingBranch.Reset();
 }
@@ -514,6 +516,8 @@ bool RunListLocks(const FUnityVersionControlProvider& InProvider, const bool bIn
 	TRACE_CPUPROFILER_EVENT_SCOPE(UnityVersionControlUtils::RunListLocks);
 
 	FLocksCache& LocksCache = bInForAllDestBranches ? LocksCacheForAllDestBranches : LocksCacheForWorkingBranch;
+
+	FScopeLock ScopeLock(&LocksCache.CriticalSection);
 
 	if (LocksCache.GetLocks(OutLocks))
 		return true;
@@ -548,6 +552,8 @@ bool RunListLocks(const FUnityVersionControlProvider& InProvider, const bool bIn
 		}
 
 		LocksCache.SetLocks(OutLocks);
+
+		UE_LOG(LogSourceControl, Verbose, TEXT("RunListLocks: %d locks"), OutLocks.Num());
 	}
 
 	return bResult;

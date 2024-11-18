@@ -104,9 +104,9 @@ public:
 
 	virtual FText GetInProgressString() const override;
 
-	FString WorkspaceName;
-	FString RepositoryName;
 	FString ServerUrl;
+	FString RepositoryName;
+	FString WorkspaceName;
 	bool bPartialWorkspace = false;
 };
 
@@ -301,6 +301,24 @@ public:
 
 	// List of files changed in the changeset
 	TArray<FUnityVersionControlStateRef> Files;
+};
+
+
+/**
+ * Internal operation to list projects from a Unity organization
+*/
+class FPlasticGetProjects final : public FSourceControlOperationBase
+{
+public:
+	// ISourceControlOperation interface
+	virtual FName GetName() const override;
+
+	virtual FText GetInProgressString() const override;
+
+	// Unity organization to list projects from
+	FString ServerUrl;
+
+	TArray<FString> ProjectNames;
 };
 
 
@@ -676,6 +694,20 @@ public:
 		: IUnityVersionControlWorker(InSourceControlProvider)
 	{}
 	virtual ~FPlasticGetChangesetFilesWorker() = default;
+	// IUnityVersionControlWorker interface
+	virtual FName GetName() const override;
+	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;
+	virtual bool UpdateStates() override;
+};
+
+/** List Projects in Unity Organization. */
+class FPlasticGetProjectsWorker final : public IUnityVersionControlWorker
+{
+public:
+	explicit FPlasticGetProjectsWorker(FUnityVersionControlProvider& InSourceControlProvider)
+		: IUnityVersionControlWorker(InSourceControlProvider)
+	{}
+	virtual ~FPlasticGetProjectsWorker() = default;
 	// IUnityVersionControlWorker interface
 	virtual FName GetName() const override;
 	virtual bool Execute(class FUnityVersionControlCommand& InCommand) override;

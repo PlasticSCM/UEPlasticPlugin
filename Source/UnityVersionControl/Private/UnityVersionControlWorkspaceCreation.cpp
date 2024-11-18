@@ -26,9 +26,16 @@ void FUnityVersionControlWorkspaceCreation::MakeWorkspace(const FParameters& InP
 void FUnityVersionControlWorkspaceCreation::LaunchMakeWorkspaceOperation()
 {
 	TSharedRef<FPlasticMakeWorkspace, ESPMode::ThreadSafe> MakeWorkspaceOperation = ISourceControlOperation::Create<FPlasticMakeWorkspace>();
-	MakeWorkspaceOperation->WorkspaceName = WorkspaceParams.WorkspaceName.ToString();
-	MakeWorkspaceOperation->RepositoryName = WorkspaceParams.RepositoryName.ToString();
 	MakeWorkspaceOperation->ServerUrl = WorkspaceParams.ServerUrl.ToString();
+	if (!WorkspaceParams.ProjectName.IsEmpty())
+	{
+		MakeWorkspaceOperation->RepositoryName = FString::Printf(TEXT("%s/%s"), *WorkspaceParams.ProjectName.ToString(), *WorkspaceParams.RepositoryName.ToString());
+	}
+	else
+	{
+		MakeWorkspaceOperation->RepositoryName = WorkspaceParams.RepositoryName.ToString();
+	}
+	MakeWorkspaceOperation->WorkspaceName = WorkspaceParams.WorkspaceName.ToString();
 	MakeWorkspaceOperation->bPartialWorkspace = WorkspaceParams.bCreatePartialWorkspace;
 
 	FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();

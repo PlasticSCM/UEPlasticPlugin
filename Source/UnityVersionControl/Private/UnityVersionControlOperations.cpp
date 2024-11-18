@@ -60,6 +60,7 @@ void IUnityVersionControlWorker::RegisterWorkers(FUnityVersionControlProvider& U
 	UnityVersionControlProvider.RegisterWorker("DeleteBranches", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticDeleteBranchesWorker>));
 	UnityVersionControlProvider.RegisterWorker("GetChangesets", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetChangesetsWorker>));
 	UnityVersionControlProvider.RegisterWorker("GetChangesetFiles", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetChangesetFilesWorker>));
+	UnityVersionControlProvider.RegisterWorker("GetProjects", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticGetProjectsWorker>));
 	UnityVersionControlProvider.RegisterWorker("MakeWorkspace", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticMakeWorkspaceWorker>));
 	UnityVersionControlProvider.RegisterWorker("Sync", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
 	UnityVersionControlProvider.RegisterWorker("SyncAll", FGetUnityVersionControlWorker::CreateStatic(&InstantiateWorker<FPlasticSyncWorker>));
@@ -261,6 +262,16 @@ FName FPlasticGetChangesetFiles::GetName() const
 FText FPlasticGetChangesetFiles::GetInProgressString() const
 {
 	return FText::Format(LOCTEXT("SourceControl_GetChangesetFiles", "Getting the list of files in changeset {0}..."), FText::AsNumber(Changeset->ChangesetId));
+}
+
+FName FPlasticGetProjects::GetName() const
+{
+	return "GetProjects";
+}
+
+FText FPlasticGetProjects::GetInProgressString() const
+{
+	return FText::Format(LOCTEXT("SourceControl_GetProjects", "Getting the projects in {0}..."), FText::FromString(ServerUrl));
 }
 
 
@@ -1120,11 +1131,6 @@ bool FPlasticMakeWorkspaceWorker::Execute(FUnityVersionControlCommand& InCommand
 		Parameters.Add(FString::Printf(TEXT("\"%s\""), *Operation->RepositoryName));
 		// Note: the whole operation should fail entirely if the repository creation failed (if the repository already exists, if the organization name is invalid, credential, authorizations etc.)
 		InCommand.bCommandSuccessful = UnityVersionControlUtils::RunCommand(TEXT("repository"), Parameters, TArray<FString>(), InCommand.InfoMessages, InCommand.ErrorMessages);
-		// Specifically detect the specific error when the organization name is invalid, and add an more human readable message.
-		if (InCommand.ErrorMessages.Contains(TEXT("Can't resolve DNS entry for cloud.plasticscm.com")))
-		{
-			InCommand.ErrorMessages.Add(TEXT("Invalid cloud organization name."));
-		}
 	}
 	if (InCommand.bCommandSuccessful)
 	{
@@ -1460,7 +1466,6 @@ bool FPlasticGetChangesetsWorker::UpdateStates()
 }
 
 
-
 FName FPlasticGetChangesetFilesWorker::GetName() const
 {
 	return "GetChangesetFiles";
@@ -1490,6 +1495,29 @@ bool FPlasticGetChangesetFilesWorker::Execute(FUnityVersionControlCommand& InCom
 }
 
 bool FPlasticGetChangesetFilesWorker::UpdateStates()
+{
+	return false;
+}
+
+
+FName FPlasticGetProjectsWorker::GetName() const
+{
+	return "GetProjects";
+}
+
+bool FPlasticGetProjectsWorker::Execute(FUnityVersionControlCommand& InCommand)
+{
+	TRACE_CPUPROFILER_EVENT_SCOPE(FPlasticGetProjectsWorker::Execute);
+
+	check(InCommand.Operation->GetName() == GetName());
+	TSharedRef<FPlasticGetProjects, ESPMode::ThreadSafe> Operation = StaticCastSharedRef<FPlasticGetProjects>(InCommand.Operation);
+
+    InCommand.bCommandSuccessful = UnityVersionControlUtils::RunGetProjects(Operation->ServerUrl, Operation->ProjectNames, InCommand.ErrorMessages);
+
+	return InCommand.bCommandSuccessful;
+}
+
+bool FPlasticGetProjectsWorker::UpdateStates()
 {
 	return false;
 }

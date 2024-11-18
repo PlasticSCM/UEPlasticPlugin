@@ -14,9 +14,10 @@ class FUnityVersionControlWorkspaceCreation
 public:
 	struct FParameters
 	{
-		FText WorkspaceName;
-		FText RepositoryName;
 		FText ServerUrl;
+		FText ProjectName;
+		FText RepositoryName;
+		FText WorkspaceName;
 		bool bCreatePartialWorkspace = false;
 		bool bAutoInitialCommit = true;
 		FText InitialCommitMessage;

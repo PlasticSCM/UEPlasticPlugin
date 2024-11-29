@@ -354,7 +354,10 @@ bool RunCheckConnection(FString& OutWorkspaceSelector, FString& OutBranchName, F
 	TArray<FString> Parameters;
 	if (UnityVersionControlUtils::GetWorkspaceInfo(OutWorkspaceSelector, OutBranchName, OutRepositoryName, OutServerUrl, OutErrorMessages))
 	{
-		Parameters.Add(FString::Printf(TEXT("--server=%s"), *OutServerUrl));
+		if ((FUnityVersionControlModule::Get().GetProvider().GetPlasticScmVersion() >= UnityVersionControlVersions::CheckConnection))
+		{
+			Parameters.Add(OutServerUrl);
+		}
 	}
 	return UnityVersionControlUtils::RunCommand(TEXT("checkconnection"), Parameters, TArray<FString>(), OutInfoMessages, OutErrorMessages);
 }

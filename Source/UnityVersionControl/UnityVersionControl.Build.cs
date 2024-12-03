@@ -7,6 +7,7 @@ public class UnityVersionControl : ModuleRules
 	public UnityVersionControl(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
+		IWYUSupport = IWYUSupport.Full;
 
 		PrivateDependencyModuleNames.AddRange(
 			new string[]

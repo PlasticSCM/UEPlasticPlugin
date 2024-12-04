@@ -7,7 +7,10 @@ public class UnityVersionControl : ModuleRules
 	public UnityVersionControl(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
-		IWYUSupport = IWYUSupport.Full;
+
+		// Note: from UE5.2 onward, bEnforceIWYU = true; is replaced by IWYUSupport = IWYUSupport.Full;
+		bEnforceIWYU = true;
+		// IWYUSupport = IWYUSupport.Full;
 
 		PrivateDependencyModuleNames.AddRange(
 			new string[]

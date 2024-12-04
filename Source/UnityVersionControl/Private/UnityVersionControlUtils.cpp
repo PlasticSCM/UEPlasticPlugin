@@ -349,12 +349,17 @@ bool GetChangesetNumber(int32& OutChangesetNumber, TArray<FString>& OutErrorMess
 	return bResult;
 }
 
+bool IsUnityOrganization(const FString& InServerUrl)
+{
+	return InServerUrl.EndsWith(TEXT("@unity"));
+}
+
 bool RunCheckConnection(FString& OutWorkspaceSelector, FString& OutBranchName, FString& OutRepositoryName, FString& OutServerUrl, TArray<FString>& OutInfoMessages, TArray<FString>& OutErrorMessages)
 {
 	TArray<FString> Parameters;
 	if (UnityVersionControlUtils::GetWorkspaceInfo(OutWorkspaceSelector, OutBranchName, OutRepositoryName, OutServerUrl, OutErrorMessages))
 	{
-		if ((FUnityVersionControlModule::Get().GetProvider().GetPlasticScmVersion() >= UnityVersionControlVersions::CheckConnection))
+		if ((FUnityVersionControlModule::Get().GetProvider().GetPlasticScmVersion() >= UnityVersionControlVersions::CheckConnection) && !IsUnityOrganization(OutServerUrl))
 		{
 			Parameters.Add(OutServerUrl);
 		}
@@ -544,7 +549,7 @@ bool RunListLocks(const FUnityVersionControlProvider& InProvider, const bool bIn
 	Parameters.Add(TEXT("list"));
 	Parameters.Add(TEXT("--machinereadable"));
 	Parameters.Add(TEXT("--smartlocks"));
-	Parameters.Add(FString::Printf(TEXT("--repository=\"%s\""), *InProvider.GetRepositoryName()));
+	Parameters.Add(FString::Printf(TEXT("--repository=\"%s\""), *InProvider.GetRepositorySpecification()));
 	Parameters.Add(TEXT("--anystatus"));
 	Parameters.Add(TEXT("--fieldseparator=\"") FILE_STATUS_SEPARATOR TEXT("\""));
 	// NOTE: --dateformat was added to smartlocks a couple of releases later in version 11.0.16.8133

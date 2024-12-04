@@ -32,11 +32,6 @@
 
 #define LOCTEXT_NAMESPACE "SUnityVersionControlSettings"
 
-bool IsUnityOrganization(const FString& InServerUrl)
-{
-	return InServerUrl.EndsWith(TEXT("@unity"));
-}
-
 void SUnityVersionControlSettings::Construct(const FArguments& InArgs)
 {
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 1
@@ -692,7 +687,7 @@ EVisibility SUnityVersionControlSettings::CanSelectProject() const
 	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
 	const bool bPlasticAvailable = Provider.IsPlasticAvailable();
 	const bool bPlasticWorkspaceFound = Provider.IsWorkspaceFound();
-	const bool bIsUnityOrganization = IsUnityOrganization(WorkspaceParams.ServerUrl.ToString());
+	const bool bIsUnityOrganization = UnityVersionControlUtils::IsUnityOrganization(WorkspaceParams.ServerUrl.ToString());
 	const bool bHasProjects = !ProjectNames.IsEmpty();
 	return (bPlasticAvailable && !bPlasticWorkspaceFound && bIsUnityOrganization && bHasProjects) ? EVisibility::Visible : EVisibility::Collapsed;
 }
@@ -702,7 +697,7 @@ EVisibility SUnityVersionControlSettings::NoProjectToSelect() const
 	const FUnityVersionControlProvider& Provider = FUnityVersionControlModule::Get().GetProvider();
 	const bool bPlasticAvailable = Provider.IsPlasticAvailable();
 	const bool bPlasticWorkspaceFound = Provider.IsWorkspaceFound();
-	const bool bIsUnityOrganization = IsUnityOrganization(WorkspaceParams.ServerUrl.ToString());
+	const bool bIsUnityOrganization = UnityVersionControlUtils::IsUnityOrganization(WorkspaceParams.ServerUrl.ToString());
 	const bool bHasProjects = !ProjectNames.IsEmpty();
 	return (bPlasticAvailable && !bPlasticWorkspaceFound && bIsUnityOrganization && !bHasProjects && !bGetProjectsInProgress) ? EVisibility::Visible : EVisibility::Collapsed;
 }
@@ -714,7 +709,7 @@ bool SUnityVersionControlSettings::IsReadyToCreatePlasticWorkspace() const
 	// RepositoryName and ServerUrl should also be filled
 	const bool bRepositoryNameOk = !WorkspaceParams.RepositoryName.IsEmpty() && !WorkspaceParams.ServerUrl.IsEmpty();
 	// And the Project is required if the server is a Unity Organization
-	const bool bProjectNameOk = !IsUnityOrganization(WorkspaceParams.ServerUrl.ToString()) || !WorkspaceParams.ProjectName.IsEmpty();
+	const bool bProjectNameOk = !UnityVersionControlUtils::IsUnityOrganization(WorkspaceParams.ServerUrl.ToString()) || !WorkspaceParams.ProjectName.IsEmpty();
 	// If Initial Commit is requested, checkin message cannot be empty
 	const bool bInitialCommitOk = (!WorkspaceParams.bAutoInitialCommit || !WorkspaceParams.InitialCommitMessage.IsEmpty());
 	return bWorkspaceNameOk && bRepositoryNameOk && bProjectNameOk && bInitialCommitOk;
@@ -755,7 +750,7 @@ void SUnityVersionControlSettings::OnServerSelected(const FText InServerName)
 	FUnityVersionControlModule::Get().GetProvider().UpdateServerUrl(WorkspaceParams.ServerUrl.ToString());
 
 	// Get the Projects for the Unity Organization
-	if (IsUnityOrganization(WorkspaceParams.ServerUrl.ToString()))
+	if (UnityVersionControlUtils::IsUnityOrganization(WorkspaceParams.ServerUrl.ToString()))
 	{
 		ProjectNames.Empty();
 
@@ -984,7 +979,7 @@ const FString SUnityVersionControlSettings::GetIgnoreFileName() const
 /** Create a standard "ignore.conf" file with common patterns for a typical Blueprint & C++ project */
 bool SUnityVersionControlSettings::CreateIgnoreFile() const
 {
-	const FString IgnoreFileContent = TEXT("Binaries\nBuild\nDerivedDataCache\nIntermediate\nSaved\nScript\nenc_temp_folder\n.idea\n.vscode\n.vs\n.ignore\n*.VC.db\n*.opensdf\n*.opendb\n*.sdf\n*.sln\n*.suo\n*.code-workspace\n*.xcodeproj\n*.xcworkspace");
+	const FString IgnoreFileContent = TEXT("Binaries\nDerivedDataCache\nIntermediate\nSaved\nScript\nenc_temp_folder\n.idea\n.vscode\n.vs\n.ignore\n*.VC.db\n*.opensdf\n*.opendb\n*.sdf\n*.sln\n*.suo\n*.code-workspace\n*.xcodeproj\n*.xcworkspace\n*.private.*");
 	return FFileHelper::SaveStringToFile(IgnoreFileContent, *GetIgnoreFileName(), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 }
 

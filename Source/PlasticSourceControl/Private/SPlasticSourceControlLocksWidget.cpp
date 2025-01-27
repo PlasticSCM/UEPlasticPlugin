@@ -21,6 +21,7 @@
 #include "Misc/MessageDialog.h"
 #include "Styling/AppStyle.h"
 #include "Widgets/Images/SImage.h"
+#include "Widgets/Input/SButton.h"
 #include "Widgets/Input/SComboButton.h"
 #include "Widgets/Input/SSearchBox.h"
 #include "Widgets/Layout/SSpacer.h"

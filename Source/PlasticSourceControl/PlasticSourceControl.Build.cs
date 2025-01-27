@@ -29,6 +29,6 @@ public class PlasticSourceControl : ModuleRules
 			}
 		);
 
-		UnsafeTypeCastWarningLevel = WarningLevel.Error;
+		CppCompileWarningSettings.UnsafeTypeCastWarningLevel = WarningLevel.Error;
 	}
 }

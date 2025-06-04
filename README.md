@@ -607,7 +607,7 @@ eg:
 
 This version here is the development version, so it always contains additional fixes, performance improvements or new features compared to the one integrated in Engine.
 
-### Version 1.12.0 2024/12/02 for UE 5.0 to 5.5
+### Version 1.12.1 2025/06/05 for UE 5.0 to 5.6
 
 [![releases](https://img.shields.io/github/release/PlasticSCM/UEPlasticPlugin.svg)](https://github.com/PlasticSCM/UEPlasticPlugin/releases)
 

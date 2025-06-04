@@ -3,7 +3,7 @@ Unity Version Control (formerly Plastic SCM) plugin for Unreal Engine
 
 [![release](https://img.shields.io/github/release/PlasticSCM/UEPlasticPlugin.svg)](https://github.com/PlasticSCM/UEPlasticPlugin/releases)
 
-This is the **official [Unity Version Control (formerly Plastic SCM)](https://unity.com/solutions/version-control) plugin for Unreal Engine 5** (UE 5.0 to 5.5) with previous releases also [supporting UE4.27](https://github.com/PlasticSCM/UEPlasticPlugin/releases/tag/1.11.0).
+This is the **official [Unity Version Control (formerly Plastic SCM)](https://unity.com/solutions/version-control) plugin for Unreal Engine 5** (UE 5.0 to 5.6) with previous releases also [supporting UE4.27](https://github.com/PlasticSCM/UEPlasticPlugin/releases/tag/1.11.0).
 
 It is now [distributed in Fab in Tools & Plugins > Engine Tools, supporting Engine Versions 5.0 to 5.5 on Windows. ![Unity Version Control in Fab](Screenshots/Fab_UnityVersionControl.png)](https://www.fab.com/listings/42f9c431-d7a7-4e09-af55-fb4b896e9c97)
 
@@ -80,6 +80,7 @@ However the integrated version will always be lagging behind the latest release 
 - UE5.1 shipped with the version 1.6.2 with support for the new View Changelists window
 - UE5.2 & 5.3 shipped with the version 1.8.0 with support for the Shelves in the renamed View Changes window
 - UE5.4 & 5.5 shipped with the version 1.9.0 with a new View Branches window to create, switch to and merge branches.
+- UE5.6 shipped with the version 1.11.0 with the new View Changesets history, to switch to older changesets or update the workspace.
 
 #### Install from Fab
 

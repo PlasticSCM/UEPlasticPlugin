@@ -672,10 +672,10 @@ Some are reserved for internal use by Epic Games with Perforce only:
 ## Support
 
 You can always ask for support in:
- - [Unity Version Control support](https://support.unity.com/hc/en-us/requests/new?ticket_form_id=360001051792)
+ - [Unity Support for Unity Version Control](https://support.unity.com/hc/en-us/sections/13795457232532-Unity-Version-Control)
  - [Unity Version Control forums](https://forum.unity.com/forums/unity-version-control.605/)
  - [Unreal Engine forums](https://forums.unrealengine.com/)
- - [Unreal Slackers Discord community](https://discord.gg/unreal-slackers)
+ - [Unreal Source Discord community](https://discord.com/invite/unrealsource)
 
 ### Enable debug logs
 

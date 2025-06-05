@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Unity Technologies
+// Copyright (c) 2025 Unity Technologies
 
 #include "UnityVersionControlUtils.h"
 
@@ -359,7 +359,7 @@ bool RunCheckConnection(FString& OutWorkspaceSelector, FString& OutBranchName, F
 	TArray<FString> Parameters;
 	if (UnityVersionControlUtils::GetWorkspaceInfo(OutWorkspaceSelector, OutBranchName, OutRepositoryName, OutServerUrl, OutErrorMessages))
 	{
-		if ((FUnityVersionControlModule::Get().GetProvider().GetPlasticScmVersion() >= UnityVersionControlVersions::CheckConnection) && !IsUnityOrganization(OutServerUrl))
+		if ((FUnityVersionControlModule::Get().GetProvider().GetPlasticScmVersion() >= UnityVersionControlVersions::CheckConnectionRepServer))
 		{
 			Parameters.Add(OutServerUrl);
 		}

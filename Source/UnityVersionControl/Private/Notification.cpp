@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Unity Technologies
+// Copyright (c) 2025 Unity Technologies
 
 #include "Notification.h"
 
@@ -121,7 +121,7 @@ void FNotification::DisplayFailure(const FSourceControlOperationBase& InOperatio
 	{
 		// If there are multiple messages, display the last one to not let the user with a notification starting with a "wait" or "in progress" message
 		const FText NotificationText = FText::Format(
-			LOCTEXT("UnityVersionControlOperation_Failure", "Error: {0} operation failed!\n{1}"),
+			LOCTEXT("UnityVersionControlOperation_FailureWithMessages", "Error: {0} operation failed!\n{1}"),
 			FText::FromName(InOperation.GetName()),
 			InOperation.GetResultInfo().ErrorMessages.Last()
 		);

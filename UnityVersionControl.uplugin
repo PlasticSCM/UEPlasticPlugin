@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 120,
-	"VersionName": "1.12.0",
+	"Version": 121,
+	"VersionName": "1.12.1",
 	"FriendlyName": "Unity Version Control",
 	"Description": "Unity Version Control (formerly Plastic SCM)",
 	"Category": "Source Control",
@@ -9,7 +9,7 @@
 	"CreatedByURL": "https://unity.com/solutions/version-control",
 	"DocsURL": "https://docs.unity.com/ugs/en-us/manual/devops/manual/vcs-plugins/unreal-plugin",
 	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/d971a6f8262e4066ba77cbd67a375884",
-	"SupportURL": "https://support.unity.com/hc/en-us/requests/new?ticket_form_id=360001051792",
+	"SupportURL": "https://support.unity.com/hc/en-us/sections/13795457232532-Unity-Version-Control",
 	"EngineVersion": "5.0.0",
 	"EnabledByDefault": true,
 	"CanContainContent": false,

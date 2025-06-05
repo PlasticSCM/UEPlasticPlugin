@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Unity Technologies
+// Copyright (c) 2025 Unity Technologies
 
 #pragma once
 
@@ -56,8 +56,8 @@ namespace UnityVersionControlVersions
 	// https://plasticscm.com/download/releasenotes/11.0.16.8445 (2024/02/22)
 	static const FSoftwareVersion WorkingBranch(TEXT("11.0.16.8445"));
 
-	// 11.0.16.9055 checkconnection learned a new optional argument <repserverspec>.
-	// https://plasticscm.com/download/releasenotes/11.0.16.9055 (2024/11/28)
-	static const FSoftwareVersion CheckConnection(TEXT("11.0.16.9055"));
+	// 11.0.16.9080 checkconnection new optional argument <repserverspec> (fixed for @unity orgs)
+	// https://plasticscm.com/download/releasenotes/11.0.16.9080 (2024/12/12)
+	static const FSoftwareVersion CheckConnectionRepServer(TEXT("11.0.16.9080"));
 
 } // namespace UnityVersionControlVersions

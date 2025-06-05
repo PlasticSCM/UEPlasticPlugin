@@ -1,4 +1,4 @@
-// Copyright (c) 2024 Unity Technologies
+// Copyright (c) 2025 Unity Technologies
 
 // Specialization of classes defined in Engine\Source\Developer\SourceControl\Public\SourceControlOperations.h
 

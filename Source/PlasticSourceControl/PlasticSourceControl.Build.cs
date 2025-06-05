@@ -37,6 +37,6 @@ public class PlasticSourceControl : ModuleRules
 		);
 
 		// NOTE: this produces warnings in Engine code in UE5.0
-		UnsafeTypeCastWarningLevel = WarningLevel.Warning;
+		// CppCompileWarningSettings.UnsafeTypeCastWarningLevel = WarningLevel.Warning;
 	}
 }
